@@ -91,6 +91,23 @@ impl Connection {
         }
     }
 
+    pub fn recv(&mut self) -> Result<protocol::Command, &str>  {
+        let hdr = self.recv_u32().unwrap();
+        if hdr < LIGHT_ID_MIN {
+            match protocol::control_header_from_u32(hdr) {
+                Ok(c)  => {
+                    let r = self.recv_u32().unwrap();
+                    Ok(protocol::Command::Control(c, r))
+                },
+                Err(_) => Err("recv command failed")
+            }
+
+        } else {
+            let len = self.recv_u32().unwrap();
+            Ok(protocol::Command::Data(hdr, len))
+        }
+    }
+
     pub fn recv_cmd(&mut self) -> Result<(), &str> {
         let lwc = self.recv_u32().unwrap();
         assert!(lwc < 0x400);
@@ -98,6 +115,7 @@ impl Connection {
         println!("received lwc {} and len {}", lwc, len);
         Ok(())
     }
+
     pub fn recv_data(&mut self) -> Result<(LightweightConnectionId, Vec<u8>), &str> {
         let lwc = self.recv_u32().unwrap();
         println!("received lwc {}", lwc);
@@ -105,6 +123,12 @@ impl Connection {
         let mut buf : Vec<u8> = iter::repeat(0).take(len as usize).collect();
         self.stream.read_exact(&mut buf[..]).unwrap();
         Ok((lwc,buf))
+    }
+
+    pub fn recv_len(&mut self, len: u32) -> Result<Vec<u8>, &str> {
+        let mut buf : Vec<u8> = iter::repeat(0).take(len as usize).collect();
+        self.stream.read_exact(&mut buf[..]).unwrap();
+        Ok(buf)
     }
 }
 
@@ -123,7 +147,7 @@ impl LightConnection {
     }
 }
 
-mod protocol {
+pub mod protocol {
     const PROTOCOL_VERSION : u32 = 0x00000000;
 
     pub enum ControlHeader {
@@ -134,6 +158,12 @@ mod protocol {
         ProbeSocket,
         ProbeSocketAck,
     }
+
+    pub enum Command {
+        Control(ControlHeader, super::LightweightConnectionId),
+        Data(super::LightweightConnectionId, u32),
+    }
+
 
     pub fn handshake(buf: &mut Vec<u8>) {
         let handshake_length = 0;
@@ -190,6 +220,18 @@ mod protocol {
             ControlHeader::CloseEndPoint        => 3,
             ControlHeader::ProbeSocket          => 4,
             ControlHeader::ProbeSocketAck       => 5,
+        }
+    }
+
+    pub fn control_header_from_u32(v: u32) -> Result<ControlHeader, ()> {
+        match v {
+            0 => Ok(ControlHeader::CreatedNewConnection),
+            1 => Ok(ControlHeader::CloseConnection),
+            2 => Ok(ControlHeader::CloseSocket),
+            3 => Ok(ControlHeader::CloseEndPoint),
+            4 => Ok(ControlHeader::ProbeSocket),
+            5 => Ok(ControlHeader::ProbeSocketAck),
+            _ => Err(()),
         }
     }
 }

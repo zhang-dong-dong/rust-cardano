@@ -1,7 +1,8 @@
 extern crate wallet_crypto;
 
 //use std::collections::{BTreeMap};
-// use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes};
+use std::collections::{LinkedList};
+use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes};
 
 pub fn send_handshake(_protocol_magic: u32) -> Vec<u8> {
 /*
@@ -55,4 +56,37 @@ pub fn send_hardcoded_blob_after_handshake() -> Vec<u8> {
     vec![
         0x53, 0x78, 0x29, 0x6e, 0xc5, 0xd4, 0x5c, 0x95, 0x24
     ]
+}
+
+// Message Header follow by the data
+type Message = (u8, Vec<u8>);
+
+// TODO move to another crate/module
+pub struct HeaderHash([u8;32]);
+impl AsRef<[u8]> for HeaderHash { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
+
+
+pub fn send_msg_subscribe(keep_alive: bool) -> Message {
+    let value = if keep_alive { 43 } else { 42 };
+    let dat = encode_to_cbor(&Value::U64(value)).unwrap();
+    (0xe, dat)
+}
+
+pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Message {
+    let mut fromEncoded = LinkedList::new();
+    for f in froms {
+        let b = Bytes::from_slice(f.as_ref());
+        fromEncoded.push_back(Value::Bytes(b));
+    }
+    let toEncoded =
+        match to {
+            None    => Value::Array(vec![]),
+            Some(h) => {
+                let b = Bytes::from_slice(h.as_ref());
+                Value::Array(vec![Value::Bytes(b)])
+            }
+        };
+    let r = Value::Array(vec![Value::IArray(fromEncoded), toEncoded]);
+    let dat = encode_to_cbor(&r).unwrap();
+    (0x4, dat)
 }

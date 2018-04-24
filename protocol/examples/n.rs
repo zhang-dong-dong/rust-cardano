@@ -20,8 +20,18 @@ fn main() {
     let buf = packet::send_hardcoded_blob_after_handshake();
     lwc.send(&buf);
 
-    connection.recv_cmd().unwrap();
-    let (id, dat) = connection.recv_data().unwrap();
+    match connection.recv().unwrap() {
+        ntt::protocol::Command::Control(_,_) => println!("control"),
+        ntt::protocol::Command::Data(_,_)    => println!("data"),
+    }
+    match connection.recv().unwrap() {
+        ntt::protocol::Command::Data(_,len)  => {
+            let dat = connection.recv_len(len);
+            println!("received data len {}", len);
+        },
+        _ => println!("error")
+    }
+    //let (id, dat) = connection.recv_data().unwrap();
 
     connection.close_light(1024);
 }
