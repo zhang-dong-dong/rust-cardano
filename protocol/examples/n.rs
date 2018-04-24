@@ -9,7 +9,7 @@ const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
 
 fn main() {
     let mut stream = TcpStream::connect(HOST).unwrap();
-    stream.set_nodelay(true);
+    stream.set_nodelay(true).unwrap();
 
     let mut connection = ntt::Connection::handshake(&mut stream).unwrap();
     connection.create_light(1024);
