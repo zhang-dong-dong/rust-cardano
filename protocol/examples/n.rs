@@ -16,12 +16,11 @@ fn main() {
     let mut lwc = ntt::LightConnection::new(&mut connection, 1024);
 
     let buf = packet::send_handshake(764824073);
-    println!("{}", buf.len());
-
+    lwc.send(&buf);
+    let buf = packet::send_hardcoded_blob_after_handshake();
     lwc.send(&buf);
 
     let (id, dat) = connection.recv_data().unwrap();
 
     connection.close_light(1024);
-
 }
