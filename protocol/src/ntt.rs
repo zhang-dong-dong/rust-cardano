@@ -91,6 +91,13 @@ impl Connection {
         }
     }
 
+    pub fn recv_cmd(&mut self) -> Result<(), &str> {
+        let lwc = self.recv_u32().unwrap();
+        assert!(lwc < 0x400);
+        let len = self.recv_u32().unwrap();
+        println!("received lwc {} and len {}", lwc, len);
+        Ok(())
+    }
     pub fn recv_data(&mut self) -> Result<(LightweightConnectionId, Vec<u8>), &str> {
         let lwc = self.recv_u32().unwrap();
         println!("received lwc {}", lwc);

@@ -20,6 +20,7 @@ fn main() {
     let buf = packet::send_hardcoded_blob_after_handshake();
     lwc.send(&buf);
 
+    connection.recv_cmd().unwrap();
     let (id, dat) = connection.recv_data().unwrap();
 
     connection.close_light(1024);
