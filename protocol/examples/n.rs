@@ -14,12 +14,13 @@ fn main() {
     stream.set_nodelay(true).unwrap();
 
     let mut connection = ntt::Connection::handshake(stream).unwrap();
-    connection.create_light(LIGHT_CONNECTION_ID);
+    let lwc = LIGHT_CONNECTION_ID;
+    connection.create_light(lwc);
 
     let buf = packet::send_handshake(PROTOCOL_MAGIC);
-    connection.light_send_data(LIGHT_CONNECTION_ID, &buf);
+    connection.light_send_data(lwc, &buf);
     let buf = packet::send_hardcoded_blob_after_handshake();
-    connection.light_send_data(LIGHT_CONNECTION_ID, &buf);
+    connection.light_send_data(lwc, &buf);
 
     match connection.recv().unwrap() {
         ntt::protocol::Command::Control(_,_) => println!("control"),
@@ -33,6 +34,24 @@ fn main() {
         _ => println!("error")
     }
     //let (id, dat) = connection.recv_data().unwrap();
+    let (id, dat) = packet::send_msg_getheaders(&[], None);
+    connection.light_send_data(lwc, &[id]);
+    connection.light_send_data(lwc, &dat[..]);
 
-    connection.close_light(LIGHT_CONNECTION_ID);
+    match connection.recv().unwrap() {
+        ntt::protocol::Command::Data(_,len)  => {
+            let dat = connection.recv_len(len);
+            println!("received data len {}", len);
+        },
+        _ => println!("error")
+    }
+    match connection.recv().unwrap() {
+        ntt::protocol::Command::Data(_,len)  => {
+            let dat = connection.recv_len(len);
+            println!("received data len {}", len);
+        },
+        _ => println!("error")
+    }
+
+    connection.close_light(lwc);
 }
