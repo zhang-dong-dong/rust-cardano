@@ -2,8 +2,9 @@ extern crate wallet_crypto;
 
 //use std::collections::{BTreeMap};
 use std::collections::{LinkedList};
+use std::{fmt};
 use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
-use self::wallet_crypto::cbor;
+use self::wallet_crypto::{cbor, util};
 
 pub fn send_handshake(_protocol_magic: u32) -> Vec<u8> {
 /*
@@ -66,6 +67,11 @@ const HASH_SIZE : usize = 32;
 // TODO move to another crate/module
 pub struct HeaderHash([u8;HASH_SIZE]);
 impl AsRef<[u8]> for HeaderHash { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
+impl fmt::Display for HeaderHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", util::hex::encode(self.as_ref()))
+    }
+}
 impl HeaderHash {
     pub fn from_bytes(bytes :[u8;HASH_SIZE]) -> Self { HeaderHash(bytes) }
     pub fn from_slice(bytes: &[u8]) -> Option<Self> {
@@ -147,6 +153,15 @@ pub struct MainBlockHeader {
     consensus: Todo,
     extra_data: Todo
 }
+impl fmt::Display for MainBlockHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!( f
+              , "Magic: 0x{:X} Previous Block: {}"
+              , self.protocol_magic
+              , self.previous_block
+              )
+    }
+}
 impl MainBlockHeader {
    pub fn new(pm: u32, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
         MainBlockHeader {
@@ -180,6 +195,15 @@ pub enum BlockHeader {
     // Todo: GenesisBlockHeader
     MainBlockHeader(MainBlockHeader)
 }
+impl fmt::Display for BlockHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &BlockHeader::MainBlockHeader(ref mbh) => {
+                write!(f, "{}", mbh)
+            }
+        }
+    }
+}
 
 impl cbor::CborValue for BlockHeader {
     fn encode(&self) -> cbor::Value {
@@ -207,6 +231,18 @@ impl cbor::CborValue for BlockHeader {
 
 pub enum BlockHeaderResponse {
     Ok(LinkedList<BlockHeader>)
+}
+impl fmt::Display for BlockHeaderResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &BlockHeaderResponse::Ok(ref ll) => {
+                for i in ll {
+                    write!(f, "{}\n", i)?;
+                }
+            }
+        }
+        write!(f, "")
+    }
 }
 impl cbor::CborValue for BlockHeaderResponse {
     fn encode(&self) -> cbor::Value {
