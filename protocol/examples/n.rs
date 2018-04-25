@@ -4,6 +4,7 @@ extern crate wallet_crypto;
 use self::protocol::ntt;
 use self::protocol::packet;
 
+use protocol::{Connection, LightConnection, LightId};
 use wallet_crypto::cbor;
 use std::net::TcpStream;
 
@@ -15,19 +16,28 @@ fn main() {
     let stream = TcpStream::connect(HOST).unwrap();
     stream.set_nodelay(true).unwrap();
 
-    let mut connection = ntt::Connection::handshake(stream).unwrap();
-    let lwc = LIGHT_CONNECTION_ID;
-    connection.create_light(lwc);
+    let conn = ntt::Connection::handshake(stream).unwrap();
+    let mut connection = Connection::new(conn);
 
-    let buf = packet::send_handshake(PROTOCOL_MAGIC);
-    connection.light_send_data(lwc, &buf);
-    let buf = packet::send_hardcoded_blob_after_handshake();
-    connection.light_send_data(lwc, &buf);
+    let lwc = LightId::new(LIGHT_CONNECTION_ID);
 
-    match connection.recv().unwrap() {
-        ntt::protocol::Command::Control(_,_) => println!("control"),
-        ntt::protocol::Command::Data(_,_)    => println!("data"),
-    }
+    connection.new_light_connection(lwc);
+
+    // we are expecting the first broadcast to respond a connection ack
+    connection.broadcast();
+    match connection.poll() {
+        Some(lc) => {
+            assert!(lc.id() == lwc);
+            assert!(lc.connected());
+        },
+        None {
+            panic!("connection failed")
+        }
+    };
+
+    connection.send_bytes(lwc, &packet::send_handshake(PROTOCOL_MAGIC));
+    connection.send_bytes(lwc, &packet::send_hardcoded_blob_after_handshake());
+
     match connection.recv().unwrap() {
         ntt::protocol::Command::Data(_,len)  => {
             let dat = connection.recv_len(len);
