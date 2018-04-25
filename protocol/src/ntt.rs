@@ -145,6 +145,32 @@ pub mod protocol {
         Data(super::LightweightConnectionId, u32),
     }
 
+    type Nonce = u64;
+    pub enum NodeControlHeader {
+        Syn,
+        Ack,
+    }
+
+    pub struct NodeId([u8;9]);
+    impl NodeId {
+        pub fn make_syn_nodeid(nonce: u64) -> Self {
+            let mut v = [0;9];
+            v[0] = 0x53; // 'S'
+            v[1] = (nonce >> 56) as u8;
+            v[2] = (nonce >> 48) as u8;
+            v[3] = (nonce >> 40) as u8;
+            v[4] = (nonce >> 32) as u8;
+            v[5] = (nonce >> 24) as u8;
+            v[6] = (nonce >> 16) as u8;
+            v[7] = (nonce >> 8) as u8;
+            v[8] = nonce as u8;
+            NodeId(v)
+        }
+
+        pub fn get_control_header(&self) -> NodeControlHeader {
+            if self.0[0] == 0x53 { NodeControlHeader::Syn } else { NodeControlHeader::Ack }
+        }
+    }
 
     pub fn handshake(buf: &mut Vec<u8>) {
         let handshake_length = 0;
