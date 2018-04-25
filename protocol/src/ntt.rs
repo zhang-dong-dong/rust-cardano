@@ -1,9 +1,8 @@
-use std::net::TcpStream;
 use std::io::Read;
 use std::io::Write;
 use std::iter;
 
-type LightweightConnectionId = u32;
+pub type LightweightConnectionId = u32;
 
 const LIGHT_ID_MIN : u32 = 1024;
 
@@ -18,18 +17,13 @@ impl EndPoint {
     }
 }
 
-pub struct Connection {
-    stream: TcpStream,
+pub struct Connection<W: Sized> {
+    stream: W,
 }
 
-impl Clone for Connection {
-    fn clone(&self) -> Self { Connection { stream: self.stream.try_clone().unwrap() } }
-}
-
-impl Connection {
-    pub fn handshake(stream: &TcpStream) -> Result<Self,&str> {
-        let s_clone = stream.try_clone().unwrap();
-        let mut conn = Connection { stream: s_clone };
+impl<W: Sized+Write+Read> Connection<W> {
+    pub fn handshake(stream: W) -> Result<Self,&'static str> {
+        let mut conn = Connection { stream: stream };
         let mut buf = vec![];
         protocol::handshake(&mut buf);
         conn.emit("handshake", &buf);
@@ -87,7 +81,7 @@ impl Connection {
                         (buf[3] as u32);
                 Ok(v)
             },
-            Err(s) => Err("recvword32: io error"),
+            Err(_) => Err("recvword32: io error"),
         }
     }
 
@@ -129,21 +123,6 @@ impl Connection {
         let mut buf : Vec<u8> = iter::repeat(0).take(len as usize).collect();
         self.stream.read_exact(&mut buf[..]).unwrap();
         Ok(buf)
-    }
-}
-
-pub struct LightConnection {
-    conn: Connection,
-    id: LightweightConnectionId,
-}
-
-impl LightConnection {
-    pub fn new(conn: &Connection, lwc: LightweightConnectionId) -> Self {
-        LightConnection { conn: conn.clone(), id: lwc }
-    }
-
-    pub fn send(&mut self, dat: &[u8]) {
-        self.conn.light_send_data(self.id, dat);
     }
 }
 
