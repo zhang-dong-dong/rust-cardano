@@ -90,6 +90,22 @@ impl cbor::CborValue for HeaderHash {
     }
 }
 
+pub enum MsgType {
+    MsgSubscribe,
+    MsgGetHeaders,
+    MsgGetBlocks,
+}
+
+impl MsgType {
+    pub fn to_u8(self) -> u8 {
+        match self {
+            MsgSubscribe => 0xe,
+            MsgGetHeaders => 0x4,
+            MsgGetBlocks => 0x6,
+        }
+    }
+}
+
 pub fn send_msg_subscribe(keep_alive: bool) -> Message {
     let value = if keep_alive { 43 } else { 42 };
     let dat = encode_to_cbor(&Value::U64(value)).unwrap();
