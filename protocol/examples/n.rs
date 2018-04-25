@@ -57,8 +57,8 @@ fn main() {
                 packet::BlockHeaderResponse::Ok(ll) =>
                     match ll.front() {
                         Some(packet::BlockHeader::MainBlockHeader(bh)) => {
-                            println!("previous block: {}", bh.previous_block);
-                            let (id2, dat2) = packet::send_msg_getheaders(&[], Some(&bh.previous_block));
+                            println!("previous block: {}", bh.previous_header);
+                            let (id2, dat2) = packet::send_msg_getheaders(&[], Some(&bh.previous_header));
                             connection.light_send_data(lwc, &[id2]);
                             connection.light_send_data(lwc, &dat2[..]);
                             match connection.recv().unwrap() {

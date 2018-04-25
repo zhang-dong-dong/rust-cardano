@@ -154,7 +154,7 @@ type Todo = Vec<Value>;
 #[derive(Debug)]
 pub struct MainBlockHeader {
     pub protocol_magic: u32,
-    pub previous_block: HeaderHash,
+    pub previous_header: HeaderHash,
     pub body_proof: Todo,
     pub consensus: Todo,
     pub extra_data: Todo
@@ -162,9 +162,9 @@ pub struct MainBlockHeader {
 impl fmt::Display for MainBlockHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!( f
-              , "Magic: 0x{:X} Previous Block: {}"
+              , "Magic: 0x{:X} Previous Header: {}"
               , self.protocol_magic
-              , self.previous_block
+              , self.previous_header
               )
     }
 }
@@ -172,7 +172,7 @@ impl MainBlockHeader {
    pub fn new(pm: u32, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
         MainBlockHeader {
             protocol_magic: pm,
-            previous_block: pb,
+            previous_header: pb,
             body_proof: bp,
             consensus: c,
             extra_data: ed
@@ -187,12 +187,12 @@ impl cbor::CborValue for MainBlockHeader {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.array().and_then(|array| {
             let (array, p_magic)    = cbor::array_decode_elem(array, 0).embed("protocol magic")?;
-            let (array, prv_block)  = cbor::array_decode_elem(array, 0).embed("Previous Block Hash")?;
+            let (array, prv_header) = cbor::array_decode_elem(array, 0).embed("Previous Block Hash")?;
             let (array, body_proof) = cbor::array_decode_elem(array, 0).embed("body proof")?;
             let (array, consensus)  = cbor::array_decode_elem(array, 0).embed("consensus")?;
             let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
             if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
-            Ok(MainBlockHeader::new(p_magic, prv_block, body_proof, consensus, extra_data))
+            Ok(MainBlockHeader::new(p_magic, prv_header, body_proof, consensus, extra_data))
         }).embed("While decoding a MainBlockHeader")
     }
 }
