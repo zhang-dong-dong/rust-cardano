@@ -9,11 +9,11 @@ use ntt;
 pub struct LightId(u32);
 impl LightId {
     /// create a `LightId` from the given number
-    /// 
+    ///
     /// identifier from 0 to 1023 are reserved.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use protocol::{LightId};
     /// let id = LightId::new(0x400);
@@ -29,35 +29,51 @@ impl LightId {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct LightConnection {
     id: LightId,
-    connected: bool,
+    client_connected: bool,
+    server_connected: bool,
     received: Option<Vec<u8>>
 }
 impl LightConnection {
     /// create a new `LightConnection` from the given `LightId`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use protocol::{LightId, LightConnection};
     /// let id = LightId::new(0x400);
     /// let lcon = LightConnection::new(id);
     /// ```
-    pub fn new(id: LightId) -> Self {
+    pub fn new_server(id: LightId) -> Self {
         LightConnection {
             id: id,
-            connected: false,
+            client_connected: false,
+            server_connected: true,
             received: None
         }
     }
-
-    pub fn (&self) -> LightId { self.id }
-
-    pub fn connected(&self) -> bool {
-        self.connected
+    pub fn new_client(id: LightId) -> Self {
+        LightConnection {
+            id: id,
+            client_connected: true,
+            server_connected: false,
+            received: None,
+        }
     }
 
-    fn connect(&mut self, st: bool) {
-        self.connected = st
+    pub fn get_id(&self) -> LightId { self.id }
+
+    pub fn client_connected(&self) -> bool {
+        self.client_connected
+    }
+    pub fn server_connected(&self) -> bool {
+        self.client_connected
+    }
+
+    fn client_set_connect(&mut self, st: bool) {
+        self.client_connected = st
+    }
+    fn server_set_connect(&mut self, st: bool) {
+        self.server_connected = st
     } 
 
     /// tell if the `LightConnection` has some pending message to read
@@ -104,8 +120,7 @@ impl<T: Write+Read> Connection<T> {
     pub fn new_light_connection_(&mut self, id: LightId, st: bool) {
         self.ntt.create_light(id.0);
 
-        let mut lc = LightConnection::new(id);
-        lc.connect(st);
+        let mut lc = LightConnection::new_client(id);
         self.light_connections.insert(id, lc);
 
         // TODO: this is a hardcoded block sent everytime we
@@ -118,14 +133,19 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {
-        match self.light_connections.remove(&id) {
+        match self.light_connections.get_mut(&id) {
             None => (),
-            Some(_lc) => self.ntt.close_light(id.0)
+            Some(con) => {
+                con.client_set_connect(false);
+                if !con.server_connected && !con.client_connected {
+                    self.light_connections.remove(&id);
+                }
+            }
         }
     }
 
     /// get a mutable reference to a LightConnection so one can read its received data
-    /// 
+    ///
     pub fn poll<'a>(&'a mut self) -> Option<&'a mut LightConnection> {
         self.light_connections.iter_mut().find(|t| t.1.pending_received()).map(|t| t.1)
     }
@@ -140,19 +160,20 @@ impl<T: Write+Read> Connection<T> {
             Command::Control(ControlHeader::CloseConnection, cid) => {
                 let id = LightId::new(cid);
                 match self.light_connections.get_mut(&id) {
-                    Some(v) => v.connect(false),
-                    None => {},
+                    Some(v) => v.server_set_connect(false),
+                    None    =>
+                        // BUG, server asked to close connection but connection doesn't exists in tree
+                        {},
                 }
             },
             Command::Control(ControlHeader::CreatedNewConnection, cid) => {
                 let id = LightId::new(cid);
-                if self.light_connections.contains_key(&id) {
-                    match self.light_connections.get_mut(&id) {
-                        Some(v) => v.connect(true),
-                        None => { unreachable!() }
+                match self.light_connections.get_mut(&id) {
+                    Some(v) => { v.server_set_connect(true); },
+                    None => {
+                        let con = LightConnection::new_server(id);
+                        self.light_connections.insert(id, con);
                     }
-                } else {
-                    self.new_light_connection_(id, true)
                 }
             },
             Command::Control(ch, cid) => {
@@ -162,7 +183,7 @@ impl<T: Write+Read> Connection<T> {
                 let id = LightId::new(cid);
                 let bytes = self.ntt.recv_len(len).unwrap();
                 match self.light_connections.get_mut(&id) {
-                    Some(v) => v.receive(&bytes),
+                    Some(con) => con.receive(&bytes),
                     None => {
                         println!("{}:{}: LightId({}) does not exists but received data", file!(), line!(), cid)
                     },
