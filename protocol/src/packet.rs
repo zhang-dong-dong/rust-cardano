@@ -67,6 +67,11 @@ const HASH_SIZE : usize = 32;
 // TODO move to another crate/module
 pub struct HeaderHash([u8;HASH_SIZE]);
 impl AsRef<[u8]> for HeaderHash { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
+impl fmt::Debug for HeaderHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", util::hex::encode(self.as_ref()))
+    }
+}
 impl fmt::Display for HeaderHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", util::hex::encode(self.as_ref()))
@@ -146,6 +151,7 @@ pub fn send_msg_getblocks(from: &HeaderHash, to: &HeaderHash) -> Message {
 
 type Todo = Vec<Value>;
 
+#[derive(Debug)]
 pub struct MainBlockHeader {
     protocol_magic: u32,
     previous_block: HeaderHash,
@@ -191,6 +197,7 @@ impl cbor::CborValue for MainBlockHeader {
     }
 }
 
+#[derive(Debug)]
 pub enum BlockHeader {
     // Todo: GenesisBlockHeader
     MainBlockHeader(MainBlockHeader)
@@ -229,6 +236,7 @@ impl cbor::CborValue for BlockHeader {
     }
 }
 
+#[derive(Debug)]
 pub enum BlockHeaderResponse {
     Ok(LinkedList<BlockHeader>)
 }

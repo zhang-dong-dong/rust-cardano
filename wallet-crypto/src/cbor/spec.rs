@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, LinkedList};
 use std::cmp::{min};
 use std::{io, result, fmt};
+use util::hex;
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord, Copy, Clone)]
 pub enum MajorType {
@@ -289,8 +290,13 @@ impl CborValue for u64 {
         v.u64().embed("while decoding `u64'")
     }
 }
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Bytes(Vec<u8>);
+impl fmt::Debug for Bytes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.as_ref()))
+    }
+}
 impl AsRef<[u8]> for Bytes { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
 impl Bytes {
     pub fn new(bytes: Vec<u8>) -> Self { Bytes(bytes) }
