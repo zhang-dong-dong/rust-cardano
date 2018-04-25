@@ -132,7 +132,9 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Mes
 }
 
 pub fn send_msg_getblocks(from: &HeaderHash, to: &HeaderHash) -> Message {
-    let dat = vec![];
+    let from_encoded = Value::Bytes(Bytes::from_slice(from.as_ref()));
+    let to_encoded = Value::Bytes(Bytes::from_slice(to.as_ref()));
+    let dat = encode_to_cbor(&Value::Array(vec![from_encoded, to_encoded])).unwrap();
     (0x6, dat)
 }
 
