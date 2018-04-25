@@ -117,16 +117,16 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Mes
 
 type Todo = Vec<Value>;
 
-pub struct BlockHeader {
+pub struct MainBlockHeader {
     protocol_magic: u32,
     previous_block: HeaderHash,
     body_proof: Todo,
     consensus: Todo,
     extra_data: Todo
 }
-impl BlockHeader {
+impl MainBlockHeader {
    pub fn new(pm: u32, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
-        BlockHeader {
+        MainBlockHeader {
             protocol_magic: pm,
             previous_block: pb,
             body_proof: bp,
@@ -136,7 +136,7 @@ impl BlockHeader {
    }
 }
 
-impl cbor::CborValue for BlockHeader {
+impl cbor::CborValue for MainBlockHeader {
     fn encode(&self) -> cbor::Value {
         unimplemented!()
     }
@@ -148,7 +148,7 @@ impl cbor::CborValue for BlockHeader {
             let (array, consensus)  = cbor::array_decode_elem(array, 0).embed("consensus")?;
             let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
             if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
-            Ok(BlockHeader::new(p_magic, prv_block, body_proof, consensus, extra_data))
+            Ok(MainBlockHeader::new(p_magic, prv_block, body_proof, consensus, extra_data))
         }).embed("While decoding a BlockHeader")
     }
 }
