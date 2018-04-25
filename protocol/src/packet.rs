@@ -131,6 +131,11 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Mes
     (0x4, dat)
 }
 
+pub fn send_msg_getblocks(from: &HeaderHash, to: &HeaderHash) -> Message {
+    let dat = vec![];
+    (0x6, dat)
+}
+
 type Todo = Vec<Value>;
 
 pub struct MainBlockHeader {
