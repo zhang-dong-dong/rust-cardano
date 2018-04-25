@@ -202,3 +202,32 @@ impl cbor::CborValue for BlockHeader {
         })
     }
 }
+
+pub enum BlockHeaderResponse {
+    Ok(LinkedList<BlockHeader>)
+}
+impl cbor::CborValue for BlockHeaderResponse {
+    fn encode(&self) -> cbor::Value {
+        match self {
+            &BlockHeaderResponse::Ok(ref l) => {
+                cbor::Value::Array(
+                   vec![ cbor::Value::U64(0)
+                       , cbor::CborValue::encode(l)
+                       ]
+                )
+            }
+        }
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+            if code == 0u64 {
+                let (array, l) = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(BlockHeaderResponse::Ok(l))
+            } else {
+                cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
+            }
+        })
+    }
+}
