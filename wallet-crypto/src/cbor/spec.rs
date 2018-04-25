@@ -186,6 +186,7 @@ pub enum Value {
     U64(u64),
     I64(i64),
     Bytes(Bytes),
+    Text(String),
     Array(Vec<Value>),
     ArrayStart,
     IArray(LinkedList<Value>),
@@ -518,6 +519,13 @@ impl<W> Encoder<W> where W: io::Write {
         self.write_bytes(v.as_ref())
     }
 
+    fn write_text(&mut self, s: &String) -> io::Result<()> {
+        let v = s.as_bytes();
+        self.write_header(MajorType::TEXT, v.len() as u64)?;
+        self.write_bytes(v)
+    }
+
+
     fn write_array(&mut self, v: &Vec<Value>) -> io::Result<()> {
         self.write_header(MajorType::ARRAY, v.len() as u64)?;
         for e in v.iter() { self.write(e)?; }
@@ -545,6 +553,7 @@ impl<W> Encoder<W> where W: io::Write {
             &Value::U64(ref v)    => self.write_header(MajorType::UINT, *v),
             &Value::I64(ref v)    => self.write_header(MajorType::NINT, *v as u64),
             &Value::Bytes(ref v)  => self.write_bs(v),
+            &Value::Text(ref v)   => self.write_text(v),
             &Value::Array(ref v)  => self.write_array(&v),
             &Value::IArray(ref v) => self.write_iarray(&v),
             &Value::ArrayStart    => self.start_indefinite(MajorType::ARRAY),
@@ -674,7 +683,15 @@ impl<R> Decoder<R> where R: Read {
                 let buf = self.reader.read(len as usize);
                 if len as usize != buf.len() { None } else { Some(Value::Bytes(Bytes::new(buf)) ) }
             },
-            MajorType::TEXT  => { unimplemented!() }
+            MajorType::TEXT  => {
+                let len = self.get_minor_type()?;
+                let buf = self.reader.read(len as usize);
+                if len as usize != buf.len() {
+                    None
+                } else {
+                    String::from_utf8(buf).ok().map(|s| Value::Text(s))
+                 }
+            },
             MajorType::ARRAY => {
                 let maybe_len = self.get_minor_type();
                 match maybe_len {
