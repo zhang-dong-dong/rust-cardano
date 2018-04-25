@@ -2,7 +2,8 @@ extern crate wallet_crypto;
 
 //use std::collections::{BTreeMap};
 use std::collections::{LinkedList};
-use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes};
+use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
+use self::wallet_crypto::cbor;
 
 pub fn send_handshake(_protocol_magic: u32) -> Vec<u8> {
 /*
@@ -61,10 +62,33 @@ pub fn send_hardcoded_blob_after_handshake() -> Vec<u8> {
 // Message Header follow by the data
 type Message = (u8, Vec<u8>);
 
+const HASH_SIZE : usize = 32;
 // TODO move to another crate/module
-pub struct HeaderHash([u8;32]);
+pub struct HeaderHash([u8;HASH_SIZE]);
 impl AsRef<[u8]> for HeaderHash { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
+impl HeaderHash {
+    pub fn from_bytes(bytes :[u8;HASH_SIZE]) -> Self { HeaderHash(bytes) }
+    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != HASH_SIZE { return None; }
+        let mut buf = [0;HASH_SIZE];
 
+        buf[0..HASH_SIZE].clone_from_slice(bytes);
+        Some(Self::from_bytes(buf))
+    }
+}
+impl cbor::CborValue for HeaderHash {
+    fn encode(&self) -> cbor::Value { cbor::Value::Bytes(cbor::Bytes::from_slice(self.as_ref())) }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.bytes().and_then(|bytes| {
+            match Self::from_slice(bytes.as_ref()) {
+                Some(digest) => Ok(digest),
+                None         => {
+                    cbor::Result::bytes(bytes, cbor::Error::InvalidSize(HASH_SIZE))
+                }
+            }
+        }).embed("while decoding Hash")
+    }
+}
 
 pub fn send_msg_subscribe(keep_alive: bool) -> Message {
     let value = if keep_alive { 43 } else { 42 };
@@ -89,4 +113,42 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Mes
     let r = Value::Array(vec![Value::IArray(fromEncoded), toEncoded]);
     let dat = encode_to_cbor(&r).unwrap();
     (0x4, dat)
+}
+
+type Todo = Vec<Value>;
+
+pub struct BlockHeader {
+    protocol_magic: u32,
+    previous_block: HeaderHash,
+    body_proof: Todo,
+    consensus: Todo,
+    extra_data: Todo
+}
+impl BlockHeader {
+   pub fn new(pm: u32, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
+        BlockHeader {
+            protocol_magic: pm,
+            previous_block: pb,
+            body_proof: bp,
+            consensus: c,
+            extra_data: ed
+        }
+   }
+}
+
+impl cbor::CborValue for BlockHeader {
+    fn encode(&self) -> cbor::Value {
+        unimplemented!()
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, p_magic)    = cbor::array_decode_elem(array, 0).embed("protocol magic")?;
+            let (array, prv_block)  = cbor::array_decode_elem(array, 0).embed("Previous Block Hash")?;
+            let (array, body_proof) = cbor::array_decode_elem(array, 0).embed("body proof")?;
+            let (array, consensus)  = cbor::array_decode_elem(array, 0).embed("consensus")?;
+            let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(BlockHeader::new(p_magic, prv_block, body_proof, consensus, extra_data))
+        }).embed("While decoding a BlockHeader")
+    }
 }
