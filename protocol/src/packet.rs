@@ -173,3 +173,32 @@ impl cbor::CborValue for MainBlockHeader {
         }).embed("While decoding a MainBlockHeader")
     }
 }
+
+pub enum BlockHeader {
+    // Todo: GenesisBlockHeader
+    MainBlockHeader(MainBlockHeader)
+}
+
+impl cbor::CborValue for BlockHeader {
+    fn encode(&self) -> cbor::Value {
+        match self {
+            &BlockHeader::MainBlockHeader(ref mbh) => {
+                cbor::Value::Array(
+                   vec![cbor::Value::U64(1), cbor::CborValue::encode(mbh)]
+                )
+            }
+        }
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+            if code == 1u64 {
+                let (array, mbh) = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(BlockHeader::MainBlockHeader(mbh))
+            } else {
+                cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
+            }
+        })
+    }
+}
