@@ -115,12 +115,9 @@ impl<T> Connection<T> {
 // TODO: split Write and Read
 impl<T: Write+Read> Connection<T> {
     pub fn new_light_connection(&mut self, id: LightId) {
-        self.new_light_connection_(id, false)
-    }
-    pub fn new_light_connection_(&mut self, id: LightId, st: bool) {
         self.ntt.create_light(id.0);
 
-        let mut lc = LightConnection::new_client(id);
+        let lc = LightConnection::new_client(id);
         self.light_connections.insert(id, lc);
 
         // TODO: this is a hardcoded block sent everytime we
@@ -133,14 +130,12 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {
-        match self.light_connections.get_mut(&id) {
-            None => (),
-            Some(con) => {
-                con.client_set_connect(false);
-                if !con.server_connected && !con.client_connected {
-                    self.light_connections.remove(&id);
-                }
-            }
+        let remove = if let Some(con) = self.light_connections.get_mut(&id) {
+            con.client_set_connect(false);
+            !con.server_connected && !con.client_connected
+        } else { false };
+        if remove {
+            self.light_connections.remove(&id);
         }
     }
 
@@ -168,12 +163,15 @@ impl<T: Write+Read> Connection<T> {
             },
             Command::Control(ControlHeader::CreatedNewConnection, cid) => {
                 let id = LightId::new(cid);
-                match self.light_connections.get_mut(&id) {
-                    Some(v) => { v.server_set_connect(true); },
-                    None => {
-                        let con = LightConnection::new_server(id);
-                        self.light_connections.insert(id, con);
-                    }
+                let create = if let Some(con) = self.light_connections.get_mut(&id) {
+                    con.server_set_connect(true);
+                    false
+                } else {
+                    true
+                };
+                if create {
+                    let con = LightConnection::new_server(id);
+                    self.light_connections.insert(id, con);
                 }
             },
             Command::Control(ch, cid) => {
