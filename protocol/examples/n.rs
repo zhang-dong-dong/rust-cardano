@@ -1,8 +1,10 @@
 extern crate protocol;
+extern crate wallet_crypto;
 
 use self::protocol::ntt;
 use self::protocol::packet;
 
+use wallet_crypto::cbor;
 use std::net::TcpStream;
 
 const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
@@ -47,8 +49,9 @@ fn main() {
     }
     match connection.recv().unwrap() {
         ntt::protocol::Command::Data(_,len)  => {
-            let dat = connection.recv_len(len);
-            println!("received data len {}", len);
+            let dat = connection.recv_len(len).unwrap();
+            let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+            println!("{}", l);
         },
         _ => println!("error")
     }
