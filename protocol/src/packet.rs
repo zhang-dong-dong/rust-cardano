@@ -187,7 +187,7 @@ impl cbor::CborValue for MainBlockHeader {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.array().and_then(|array| {
             let (array, p_magic)    = cbor::array_decode_elem(array, 0).embed("protocol magic")?;
-            let (array, prv_header) = cbor::array_decode_elem(array, 0).embed("Previous Block Hash")?;
+            let (array, prv_header) = cbor::array_decode_elem(array, 0).embed("Previous Header Hash")?;
             let (array, body_proof) = cbor::array_decode_elem(array, 0).embed("body proof")?;
             let (array, consensus)  = cbor::array_decode_elem(array, 0).embed("consensus")?;
             let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
