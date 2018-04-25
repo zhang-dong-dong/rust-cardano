@@ -52,6 +52,33 @@ fn main() {
             let dat = connection.recv_len(len).unwrap();
             let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
             println!("{}", l);
+
+            match l {
+                packet::BlockHeaderResponse::Ok(ll) =>
+                    match ll.front() {
+                        Some(packet::BlockHeader::MainBlockHeader(bh)) => {
+                            println!("previous block: {}", bh.previous_block);
+                            let (id2, dat2) = packet::send_msg_getheaders(&[], Some(&bh.previous_block));
+                            connection.light_send_data(lwc, &[id2]);
+                            connection.light_send_data(lwc, &dat2[..]);
+                            match connection.recv().unwrap() {
+                                ntt::protocol::Command::Data(_,len)  => {
+                                    let dat = connection.recv_len(len).unwrap();
+                                    let x : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+                                    println!("previous block is: {:?}", x)
+                                },
+                                ntt::protocol::Command::Control(x, y) => {
+                                    println!("control taken error {:?} {}", x, y)
+                                }
+                            }
+                        },
+                        _  => println!("error no block header"),
+                    }
+            }
+
+
+            //let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+            //println!("{}", l);
         },
         _ => println!("error")
     }

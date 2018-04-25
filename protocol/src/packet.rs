@@ -110,9 +110,9 @@ pub enum MsgType {
 impl MsgType {
     pub fn to_u8(self) -> u8 {
         match self {
-            MsgSubscribe => 0xe,
-            MsgGetHeaders => 0x4,
-            MsgGetBlocks => 0x6,
+            MsgType::MsgSubscribe => 0xe,
+            MsgType::MsgGetHeaders => 0x4,
+            MsgType::MsgGetBlocks => 0x6,
         }
     }
 }
@@ -153,11 +153,11 @@ type Todo = Vec<Value>;
 
 #[derive(Debug)]
 pub struct MainBlockHeader {
-    protocol_magic: u32,
-    previous_block: HeaderHash,
-    body_proof: Todo,
-    consensus: Todo,
-    extra_data: Todo
+    pub protocol_magic: u32,
+    pub previous_block: HeaderHash,
+    pub body_proof: Todo,
+    pub consensus: Todo,
+    pub extra_data: Todo
 }
 impl fmt::Display for MainBlockHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

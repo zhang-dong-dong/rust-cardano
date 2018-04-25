@@ -129,6 +129,7 @@ impl<W: Sized+Write+Read> Connection<W> {
 pub mod protocol {
     const PROTOCOL_VERSION : u32 = 0x00000000;
 
+    #[derive(Debug)]
     pub enum ControlHeader {
         CreatedNewConnection,
         CloseConnection,
@@ -138,6 +139,7 @@ pub mod protocol {
         ProbeSocketAck,
     }
 
+    #[derive(Debug)]
     pub enum Command {
         Control(ControlHeader, super::LightweightConnectionId),
         Data(super::LightweightConnectionId, u32),
