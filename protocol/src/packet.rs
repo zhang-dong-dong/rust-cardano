@@ -170,6 +170,6 @@ impl cbor::CborValue for MainBlockHeader {
             let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
             if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
             Ok(MainBlockHeader::new(p_magic, prv_block, body_proof, consensus, extra_data))
-        }).embed("While decoding a BlockHeader")
+        }).embed("While decoding a MainBlockHeader")
     }
 }
