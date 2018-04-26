@@ -311,7 +311,7 @@ type Todo = Vec<Value>;
 
 #[derive(Debug)]
 pub struct MainBlockHeader {
-    pub protocol_magic: u32,
+    pub protocol_magic: ProtocolMagic,
     pub previous_header: HeaderHash,
     pub body_proof: Todo,
     pub consensus: Todo,
@@ -320,14 +320,14 @@ pub struct MainBlockHeader {
 impl fmt::Display for MainBlockHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!( f
-              , "Magic: 0x{:X} Previous Header: {}"
+              , "Magic: 0x{:?} Previous Header: {}"
               , self.protocol_magic
               , self.previous_header
               )
     }
 }
 impl MainBlockHeader {
-   pub fn new(pm: u32, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
+   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
         MainBlockHeader {
             protocol_magic: pm,
             previous_header: pb,
