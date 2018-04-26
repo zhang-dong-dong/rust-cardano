@@ -99,7 +99,7 @@ impl<T: Write+Read> Connection<T> {
         return x;
     }
 
-    pub fn new(ntt: ntt::Connection<T>, pm: u32) -> Self {
+    pub fn new(ntt: ntt::Connection<T>, hs: &packet::Handshake) -> Self {
         let mut conn = Connection {
             ntt: ntt,
             server_cons: BTreeMap::new(),
@@ -114,7 +114,7 @@ impl<T: Write+Read> Connection<T> {
 
         // we are expecting the first broadcast to respond a connection ack
         // initial handshake
-        conn.send_bytes(lcid, &packet::send_handshake(&Default::default()));
+        conn.send_bytes(lcid, &packet::send_handshake(hs));
         conn.send_bytes(lcid, &packet::send_hardcoded_blob_after_handshake());
 
         conn.broadcast(); // expect ack of connection creation

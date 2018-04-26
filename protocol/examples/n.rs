@@ -82,7 +82,8 @@ fn main() {
     stream.set_nodelay(true).unwrap();
 
     let conn = ntt::Connection::handshake(drg_seed, stream).unwrap();
-    let mut connection = Connection::new(conn, PROTOCOL_MAGIC);
+    let hs = packet::Handshake::default();
+    let mut connection = Connection::new(conn, &hs);
 
     let mut mbh = GetBlockHeader::first().execute(&mut connection, LightId::new(0x401))
         .expect("to get one header at least");
