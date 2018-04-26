@@ -1,3 +1,5 @@
+extern crate wallet_crypto;
+
 pub mod ntt;
 pub mod packet;
 

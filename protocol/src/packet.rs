@@ -1,11 +1,9 @@
-extern crate wallet_crypto;
-
 use std::collections::{BTreeMap};
 use std::collections::{LinkedList};
 use std::{fmt};
-use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
-use self::wallet_crypto::{cbor, util};
-use self::wallet_crypto::config::{ProtocolMagic};
+use wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
+use wallet_crypto::{cbor, util};
+use wallet_crypto::config::{ProtocolMagic};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Version {

@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::io::{Read, Write};
 
 use packet;
+use packet::{Handshake};
 use ntt;
+
+use wallet_crypto::cbor;
 
 /// Light ID create by the server or by the client
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
@@ -121,7 +124,9 @@ impl<T: Write+Read> Connection<T> {
         conn.broadcast(); // expect the handshake reply
         if let Some(lc) = conn.poll() {
             assert!(lc.get_id() == lcid);
-            let _ = lc.get_received();
+            let bs = lc.get_received().unwrap();
+            let _hs : Handshake = cbor::decode_from_cbor(&bs).unwrap();
+            // println!("{}", _hs);
         }
         conn.broadcast(); // expect some data regarding the nodeid or something like it
         if let Some(lc) = conn.poll() {

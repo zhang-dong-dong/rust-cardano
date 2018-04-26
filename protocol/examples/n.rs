@@ -12,9 +12,13 @@ use wallet_crypto::config::{ProtocolMagic};
 use std::net::TcpStream;
 use std::io::{Read, Write};
 
-const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
-//const LIGHT_CONNECTION_ID : ntt::LightweightConnectionId = 0x401;
-const PROTOCOL_MAGIC : u32 = 764824073;
+// mainnet:
+// const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
+// const PROTOCOL_MAGIC : u32 = 764824073;
+
+// staging:
+const HOST: &'static str = "relays.awstest.iohkdev.io:3000";
+const PROTOCOL_MAGIC : u32 = 633343913;
 
 trait Command<W: Read+Write> {
     type Output;
