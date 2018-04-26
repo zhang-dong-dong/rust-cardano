@@ -125,8 +125,8 @@ impl<T: Write+Read> Connection<T> {
         // out what it is at some point.
         //
         // see the send endpoint command
-        let buf = packet::send_hardcoded_blob_after_handshake();
-        self.send_bytes(id, &buf);
+        // let buf = packet::send_hardcoded_blob_after_handshake();
+        // self.send_bytes(id, &buf);
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {
