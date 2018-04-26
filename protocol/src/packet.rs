@@ -123,7 +123,7 @@ pub fn send_msg_subscribe(keep_alive: bool) -> Message {
     (0xe, dat)
 }
 
-pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Message {
+pub fn send_msg_getheaders(froms: &[HeaderHash], to: &Option<HeaderHash>) -> Message {
     let mut fromEncoded = LinkedList::new();
     for f in froms {
         let b = Bytes::from_slice(f.as_ref());
@@ -131,8 +131,8 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: Option<&HeaderHash>) -> Mes
     }
     let toEncoded =
         match to {
-            None    => Value::Array(vec![]),
-            Some(h) => {
+            &None    => Value::Array(vec![]),
+            &Some(ref h) => {
                 let b = Bytes::from_slice(h.as_ref());
                 Value::Array(vec![Value::Bytes(b)])
             }
