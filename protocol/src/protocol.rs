@@ -103,17 +103,39 @@ pub struct Connection<T> {
     ntt:               ntt::Connection<T>,
     light_connections: BTreeMap<LightId, LightConnection>
 }
-impl<T> Connection<T> {
-    pub fn new(ntt: ntt::Connection<T>) -> Self {
-        Connection {
+
+impl<T: Write+Read> Connection<T> {
+    pub fn new(ntt: ntt::Connection<T>, pm: u32) -> Self {
+        let mut conn = Connection {
             ntt: ntt,
             light_connections: BTreeMap::new()
-        }
-    }
-}
+        };
 
-// TODO: split Write and Read
-impl<T: Write+Read> Connection<T> {
+        let lcid = LightId(0x400);
+        let lc = LightConnection::new_client(lcid);
+        conn.ntt.create_light(lcid.0);
+        conn.light_connections.insert(lcid, lc);
+
+        // we are expecting the first broadcast to respond a connection ack
+        // initial handshake
+        conn.send_bytes(lcid, &packet::send_handshake(pm));
+        conn.send_bytes(lcid, &packet::send_hardcoded_blob_after_handshake());
+        conn.broadcast();
+        conn.broadcast();
+        if let Some(lc) = conn.poll() {
+            assert!(lc.get_id() == lcid);
+            let _ = lc.get_received();
+        }
+        conn.broadcast();
+        if let Some(lc) = conn.poll() {
+            assert!(lc.get_id() == lcid);
+            let _ = lc.get_received();
+        }
+        conn.close_light_connection(lcid);
+
+        conn
+    }
+
     pub fn new_light_connection(&mut self, id: LightId) {
         self.ntt.create_light(id.0);
 
@@ -125,8 +147,8 @@ impl<T: Write+Read> Connection<T> {
         // out what it is at some point.
         //
         // see the send endpoint command
-        // let buf = packet::send_hardcoded_blob_after_handshake();
-        // self.send_bytes(id, &buf);
+        let buf = packet::send_hardcoded_blob_after_handshake();
+        self.send_bytes(id, &buf);
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {

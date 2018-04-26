@@ -9,7 +9,7 @@ use wallet_crypto::cbor;
 use std::net::TcpStream;
 
 const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
-const LIGHT_CONNECTION_ID : ntt::LightweightConnectionId = 0x400;
+const LIGHT_CONNECTION_ID : ntt::LightweightConnectionId = 0x401;
 const PROTOCOL_MAGIC : u32 = 764824073;
 
 fn main() {
@@ -17,28 +17,11 @@ fn main() {
     stream.set_nodelay(true).unwrap();
 
     let conn = ntt::Connection::handshake(stream).unwrap();
-    let mut connection = Connection::new(conn);
+    let mut connection = Connection::new(conn, PROTOCOL_MAGIC);
 
     let lwc = LightId::new(LIGHT_CONNECTION_ID);
-
     connection.new_light_connection(lwc);
-
-    // we are expecting the first broadcast to respond a connection ack
-    // initial handshake
-    connection.send_bytes(lwc, &packet::send_handshake(PROTOCOL_MAGIC));
-    connection.send_bytes(lwc, &packet::send_hardcoded_blob_after_handshake());
-    connection.broadcast();
-    connection.broadcast();
-    match connection.poll() {
-        Some(lc) => {
-            assert!(lc.get_id() == lwc);
-            // drop the received data.
-            let _ = lc.get_received();
-        },
-        None => {
-            // panic!("connection failed");
-        }
-    };
+    connection.broadcast(); // expect ack of connection creation
 
     // require the initial header
     let (mut get_header_id, mut get_header_dat) = packet::send_msg_getheaders(&[], None);
