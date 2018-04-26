@@ -152,21 +152,36 @@ pub mod protocol {
     }
 
     pub struct NodeId([u8;9]);
+
+    impl AsRef<[u8]> for NodeId {
+        fn as_ref(&self) -> &[u8] { &self.0 }
+    }
+
+    // use make_syn_nodeid or make_ack_nodeid
+    fn make_nodeid(header: NodeControlHeader, nonce: u64) -> NodeId {
+        let mut v = [0;9];
+        v[0] = match header {
+                    NodeControlHeader::Syn => 0x53, // 'S'
+                    NodeControlHeader::Ack => 0x41  // 'A'
+        };
+        v[1] = (nonce >> 56) as u8;
+        v[2] = (nonce >> 48) as u8;
+        v[3] = (nonce >> 40) as u8;
+        v[4] = (nonce >> 32) as u8;
+        v[5] = (nonce >> 24) as u8;
+        v[6] = (nonce >> 16) as u8;
+        v[7] = (nonce >> 8) as u8;
+        v[8] = nonce as u8;
+        NodeId(v)
+    }
+
     impl NodeId {
         pub fn make_syn_nodeid(nonce: u64) -> Self {
-            let mut v = [0;9];
-            v[0] = 0x53; // 'S'
-            v[1] = (nonce >> 56) as u8;
-            v[2] = (nonce >> 48) as u8;
-            v[3] = (nonce >> 40) as u8;
-            v[4] = (nonce >> 32) as u8;
-            v[5] = (nonce >> 24) as u8;
-            v[6] = (nonce >> 16) as u8;
-            v[7] = (nonce >> 8) as u8;
-            v[8] = nonce as u8;
-            NodeId(v)
+            make_nodeid(NodeControlHeader::Syn, nonce)
         }
-
+        pub fn make_ack_nodeid(nonce: u64) -> Self {
+            make_nodeid(NodeControlHeader::Ack, nonce)
+        }
         pub fn get_control_header(&self) -> NodeControlHeader {
             if self.0[0] == 0x53 { NodeControlHeader::Syn } else { NodeControlHeader::Ack }
         }
