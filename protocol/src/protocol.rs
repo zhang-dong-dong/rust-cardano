@@ -114,7 +114,7 @@ impl<T: Write+Read> Connection<T> {
 
         // we are expecting the first broadcast to respond a connection ack
         // initial handshake
-        conn.send_bytes(lcid, &packet::send_handshake(pm));
+        conn.send_bytes(lcid, &packet::send_handshake(&Default::default()));
         conn.send_bytes(lcid, &packet::send_hardcoded_blob_after_handshake());
 
         conn.broadcast(); // expect ack of connection creation

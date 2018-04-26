@@ -1,57 +1,217 @@
 extern crate wallet_crypto;
 
-//use std::collections::{BTreeMap};
+use std::collections::{BTreeMap};
 use std::collections::{LinkedList};
 use std::{fmt};
 use self::wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
 use self::wallet_crypto::{cbor, util};
+use self::wallet_crypto::config::{ProtocolMagic};
 
-pub fn send_handshake(_protocol_magic: u32) -> Vec<u8> {
-/*
-    let mut inSpecs = BTreeMap::new();
-    let mut outSpecs = BTreeMap::new();
-
-    let inHandlers = [ (4u64, b"05") ];
-    let outHandlers = [ (4u64, b"05") ];
-
-    for (k,bs) in inHandlers.iter() {
-        let b = Bytes::from_slice(&bs[..]);
-        inSpecs.insert(ObjectKey::Integer(*k), Value::Array(vec![ Value::U64(0), Value::Tag(24, Box::new(Value::Bytes(b)))]));
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct Version {
+   major:    u32, 
+   minor:    u32, 
+   revision: u32, 
+}
+impl Version {
+    pub fn new(major: u32, minor: u32, revision: u32) -> Self {
+        Version { major: major, minor: minor, revision: revision }
     }
-
-    for (k,bs) in outHandlers.iter() {
-        let b = Bytes::from_slice(&bs[..]);
-        outSpecs.insert(ObjectKey::Integer(*k), Value::Array(vec![ Value::U64(0), Value::Tag(24, Box::new(Value::Bytes(b)))]));
+}
+impl Default for Version {
+    fn default() -> Self { Version::new(0,1,0) }
+}
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.revision)
     }
+}
+impl cbor::CborValue for Version {
+    fn encode(&self) -> cbor::Value {
+        cbor::Value::Array(
+            vec![
+                cbor::CborValue::encode(&self.major),
+                cbor::CborValue::encode(&self.minor),
+                cbor::CborValue::encode(&self.revision),
+            ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, major)    = cbor::array_decode_elem(array, 0).embed("major")?;
+            let (array, minor)    = cbor::array_decode_elem(array, 0).embed("minor")?;
+            let (array, revision) = cbor::array_decode_elem(array, 0).embed("revision")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(Version::new(major, minor, revision))
+        }).embed("while decoding Version")
+    }
+}
 
-    let content = vec![ Value::U64(protocol_magic as u64)
-                      , Value::Array(vec![Value::U64(0), Value::U64(1), Value::U64(0)])
-                      , Value::Object(inSpecs)
-                      , Value::Object(outSpecs)
-                      ];
-    encode_to_cbor(&Value::Array(content)).unwrap()
-*/
-    vec![
-        0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0x83, 0x00
-      , 0x01, 0x00, 0xb3, 0x04, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x05, 0x05, 0x82, 0x00, 0xd8, 0x18, 0x41
-      , 0x04, 0x06, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x07, 0x18, 0x22, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
-      , 0x5e, 0x18, 0x25, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5e, 0x18, 0x2b, 0x82, 0x00, 0xd8, 0x18
-      , 0x42, 0x18, 0x5d, 0x18, 0x31, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5c, 0x18, 0x37, 0x82, 0x00
-      , 0xd8, 0x18, 0x42, 0x18, 0x62, 0x18, 0x3d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x61, 0x18, 0x43
-      , 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x60, 0x18, 0x49, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5f
-      , 0x18, 0x53, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x00, 0x18, 0x5c, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
-      , 0x31, 0x18, 0x5d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x2b, 0x18, 0x5e, 0x82, 0x00, 0xd8, 0x18
-      , 0x42, 0x18, 0x25, 0x18, 0x5f, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x49, 0x18, 0x60, 0x82, 0x00
-      , 0xd8, 0x18, 0x42, 0x18, 0x43, 0x18, 0x61, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x3d, 0x18, 0x62
-      , 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x37, 0xad, 0x04, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x05, 0x05
-      , 0x82, 0x00, 0xd8, 0x18, 0x41, 0x04, 0x06, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x07, 0x0d, 0x82, 0x00
-      , 0xd8, 0x18, 0x41, 0x00, 0x0e, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x00, 0x18, 0x25, 0x82, 0x00, 0xd8
-      , 0x18, 0x42, 0x18, 0x5e, 0x18, 0x2b, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5d, 0x18, 0x31, 0x82
-      , 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5c, 0x18, 0x37, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x62, 0x18
-      , 0x3d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x61, 0x18, 0x43, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
-      , 0x60, 0x18, 0x49, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5f, 0x18, 0x53, 0x82, 0x00, 0xd8, 0x18
-      , 0x41, 0x00
-    ]
+type MessageCode = u32;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct HandlerSpec(u16);
+impl HandlerSpec {
+    pub fn new(c: u16) -> Self { HandlerSpec(c) }
+}
+impl fmt::Display for HandlerSpec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl cbor::CborValue for HandlerSpec {
+    fn encode(&self) -> cbor::Value {
+        let b = cbor::encode_to_cbor(&self.0).unwrap();
+        cbor::Value::Array(
+            vec![ cbor::Value::U64(0)
+                , cbor::Value::Tag(24, Box::new(cbor::Value::Bytes(cbor::Bytes::new(b))))
+                ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, id) = cbor::array_decode_elem(array, 0).embed("sum type id")?;
+            if id != 0u64 { return cbor::Result::array(array, cbor::Error::InvalidSumtype(id)); }
+            let (array, tag) = cbor::array_decode_elem(array, 0).embed("tagged bytes")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            cbor::Value::tag(tag).and_then(|(tag_id, value)| {
+                assert!(tag_id == 24);
+                value.bytes().and_then(|bs| {
+                    cbor::decode_from_cbor(bs.as_ref())
+                }).map(|c| HandlerSpec::new(c))
+            })
+        }).embed("while decoding HandlerSpec")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct HandlerSpecs(BTreeMap<MessageCode, HandlerSpec>);
+impl HandlerSpecs {
+    pub fn default_ins() -> Self {
+        let mut bm = BTreeMap::new();
+        bm.insert(0x04,  HandlerSpec::new(0x05));
+        bm.insert(0x05,  HandlerSpec::new(0x04));
+        bm.insert(0x06,  HandlerSpec::new(0x07));
+        bm.insert(0x22,  HandlerSpec::new(0x5e));
+        bm.insert(0x25,  HandlerSpec::new(0x5e));
+        bm.insert(0x2b,  HandlerSpec::new(0x5d));
+        bm.insert(0x31,  HandlerSpec::new(0x5c));
+        bm.insert(0x37,  HandlerSpec::new(0x62));
+        bm.insert(0x3d,  HandlerSpec::new(0x61));
+        bm.insert(0x43,  HandlerSpec::new(0x60));
+        bm.insert(0x49,  HandlerSpec::new(0x5f));
+        bm.insert(0x53,  HandlerSpec::new(0x00));
+        bm.insert(0x5c,  HandlerSpec::new(0x31));
+        bm.insert(0x5d,  HandlerSpec::new(0x2b));
+        bm.insert(0x5e,  HandlerSpec::new(0x25));
+        bm.insert(0x5f,  HandlerSpec::new(0x49));
+        bm.insert(0x60,  HandlerSpec::new(0x43));
+        bm.insert(0x61,  HandlerSpec::new(0x3d));
+        bm.insert(0x62,  HandlerSpec::new(0x37));
+        HandlerSpecs(bm)
+    }
+    pub fn default_outs() -> Self {
+        let mut bm = BTreeMap::new();
+        bm.insert(0x04,  HandlerSpec::new(0x05));
+        bm.insert(0x05,  HandlerSpec::new(0x04));
+        bm.insert(0x06,  HandlerSpec::new(0x07));
+        bm.insert(0x0d,  HandlerSpec::new(0x00));
+        bm.insert(0x0e,  HandlerSpec::new(0x00));
+        bm.insert(0x25,  HandlerSpec::new(0x5e));
+        bm.insert(0x2b,  HandlerSpec::new(0x5d));
+        bm.insert(0x31,  HandlerSpec::new(0x5c));
+        bm.insert(0x37,  HandlerSpec::new(0x62));
+        bm.insert(0x3d,  HandlerSpec::new(0x61));
+        bm.insert(0x43,  HandlerSpec::new(0x60));
+        bm.insert(0x49,  HandlerSpec::new(0x5f));
+        bm.insert(0x53,  HandlerSpec::new(0x00));
+        HandlerSpecs(bm)
+    }
+}
+impl cbor::CborValue for HandlerSpecs {
+    fn encode(&self) -> cbor::Value {
+        let bm = self.0.iter().map(|(k,v)| (cbor::ObjectKey::Integer(*k as u64), cbor::CborValue::encode(v))).collect();
+        cbor::Value::Object(bm)
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.object().and_then(|object| {
+            let mut bm = BTreeMap::new();
+            for (cbor::ObjectKey::Integer(k), v) in object.iter() {
+                bm.insert(*k as u32, cbor::CborValue::decode(v.clone())?);
+            }
+            Ok(HandlerSpecs(bm))
+        }).embed("while decoding HandlerSpecs")
+    }
+}
+impl fmt::Display for HandlerSpecs {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for kv in self.0.iter() {
+            write!(f, "  * {} -> {}\n", kv.0, kv.1)?;
+        }
+        write!(f, "")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct Handshake {
+    protocol_magic: ProtocolMagic,
+    version: Version,
+    in_handlers:  HandlerSpecs,
+    out_handlers: HandlerSpecs
+}
+impl Handshake {
+    pub fn new(pm: ProtocolMagic, v: Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {
+        Handshake {
+            protocol_magic: pm,
+            version: v,
+            in_handlers: ins,
+            out_handlers: outs
+        }
+    }
+}
+impl fmt::Display for Handshake {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "protocol magic: {:?}", self.protocol_magic)?;
+        writeln!(f, "version: {}", self.version)?;
+        writeln!(f, "in handlers:\n{}", self.in_handlers)?;
+        writeln!(f, "out handlers:\n{}", self.out_handlers)
+    }
+}
+impl Default for Handshake {
+    fn default() -> Self {
+        Handshake::new(
+            ProtocolMagic::default(),
+            Version::default(),
+            HandlerSpecs::default_ins(),
+            HandlerSpecs::default_outs(),
+        )
+    }
+}
+impl cbor::CborValue for Handshake {
+    fn encode(&self) -> cbor::Value {
+        cbor::Value::Array(
+            vec![
+                cbor::CborValue::encode(&self.protocol_magic),
+                cbor::CborValue::encode(&self.version),
+                cbor::CborValue::encode(&self.in_handlers),
+                cbor::CborValue::encode(&self.out_handlers),
+            ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, pm)   = cbor::array_decode_elem(array, 0)?;
+            let (array, v)    = cbor::array_decode_elem(array, 0)?;
+            let (array, ins)  = cbor::array_decode_elem(array, 0)?;
+            let (array, outs) = cbor::array_decode_elem(array, 0)?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(Handshake::new(pm, v, ins, outs))
+        }).embed("while decoding Version")
+    }
+}
+
+pub fn send_handshake(hs: &Handshake) -> Vec<u8> {
+    cbor::encode_to_cbor(hs).unwrap()
 }
 
 pub fn send_hardcoded_blob_after_handshake() -> Vec<u8> {
@@ -332,5 +492,50 @@ mod tests {
         match b {
             BlockHeaderResponse::Ok(ll) => assert!(ll.len() == 1),
         }
+    }
+
+    const HANDSHAKE_BYTES : &'static [u8] = &[
+        0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0x83, 0x00
+      , 0x01, 0x00, 0xb3, 0x04, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x05, 0x05, 0x82, 0x00, 0xd8, 0x18, 0x41
+      , 0x04, 0x06, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x07, 0x18, 0x22, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
+      , 0x5e, 0x18, 0x25, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5e, 0x18, 0x2b, 0x82, 0x00, 0xd8, 0x18
+      , 0x42, 0x18, 0x5d, 0x18, 0x31, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5c, 0x18, 0x37, 0x82, 0x00
+      , 0xd8, 0x18, 0x42, 0x18, 0x62, 0x18, 0x3d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x61, 0x18, 0x43
+      , 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x60, 0x18, 0x49, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5f
+      , 0x18, 0x53, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x00, 0x18, 0x5c, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
+      , 0x31, 0x18, 0x5d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x2b, 0x18, 0x5e, 0x82, 0x00, 0xd8, 0x18
+      , 0x42, 0x18, 0x25, 0x18, 0x5f, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x49, 0x18, 0x60, 0x82, 0x00
+      , 0xd8, 0x18, 0x42, 0x18, 0x43, 0x18, 0x61, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x3d, 0x18, 0x62
+      , 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x37, 0xad, 0x04, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x05, 0x05
+      , 0x82, 0x00, 0xd8, 0x18, 0x41, 0x04, 0x06, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x07, 0x0d, 0x82, 0x00
+      , 0xd8, 0x18, 0x41, 0x00, 0x0e, 0x82, 0x00, 0xd8, 0x18, 0x41, 0x00, 0x18, 0x25, 0x82, 0x00, 0xd8
+      , 0x18, 0x42, 0x18, 0x5e, 0x18, 0x2b, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5d, 0x18, 0x31, 0x82
+      , 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5c, 0x18, 0x37, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x62, 0x18
+      , 0x3d, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x61, 0x18, 0x43, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18
+      , 0x60, 0x18, 0x49, 0x82, 0x00, 0xd8, 0x18, 0x42, 0x18, 0x5f, 0x18, 0x53, 0x82, 0x00, 0xd8, 0x18
+      , 0x41, 0x00
+    ];
+
+    #[test]
+    fn handshake_decoding() {
+        let hs = Handshake::default();
+
+        let hs_ : Handshake = cbor::decode_from_cbor(HANDSHAKE_BYTES).unwrap();
+        println!("");
+        println!("{}", hs.in_handlers);
+        println!("{}", hs_.in_handlers);
+        assert_eq!(hs.protocol_magic, hs_.protocol_magic);
+        assert_eq!(hs.version, hs_.version);
+        assert_eq!(hs.in_handlers, hs_.in_handlers);
+        assert_eq!(hs.out_handlers, hs_.out_handlers);
+        assert_eq!(hs, hs_);
+    }
+
+    #[test]
+    fn handshake_encoding() {
+        let hs = Handshake::default();
+
+        let vec = cbor::encode_to_cbor(&hs).unwrap();
+        assert_eq!(HANDSHAKE_BYTES, vec.as_slice());
     }
 }
