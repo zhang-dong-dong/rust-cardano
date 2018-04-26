@@ -22,6 +22,9 @@ impl LightId {
         assert!(id >= 1024);
         LightId(id)
     }
+    pub fn next(self) -> Self {
+        LightId(self.0 + 1)
+    }
 }
 
 /// A light connection will hold pending message to send or
@@ -29,43 +32,26 @@ impl LightId {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct LightConnection {
     id: LightId,
-    client_connected: bool,
-    server_connected: bool,
+    node_id: Option<ntt::protocol::NodeId>,
     received: Option<Vec<u8>>
 }
 impl LightConnection {
-    pub fn new_server(id: LightId) -> Self {
+    pub fn new_with_nodeid(id: LightId, nonce: u64) -> Self {
         LightConnection {
             id: id,
-            client_connected: false,
-            server_connected: true,
+            node_id: Some (ntt::protocol::NodeId::make_syn(nonce)),
             received: None
         }
     }
-    pub fn new_client(id: LightId) -> Self {
+    pub fn new_expecting_nodeid(id: LightId) -> Self {
         LightConnection {
             id: id,
-            client_connected: true,
-            server_connected: false,
-            received: None,
+            node_id: None,
+            received: None
         }
     }
 
     pub fn get_id(&self) -> LightId { self.id }
-
-    pub fn client_connected(&self) -> bool {
-        self.client_connected
-    }
-    pub fn server_connected(&self) -> bool {
-        self.client_connected
-    }
-
-    fn client_set_connect(&mut self, st: bool) {
-        self.client_connected = st
-    }
-    fn server_set_connect(&mut self, st: bool) {
-        self.server_connected = st
-    } 
 
     /// tell if the `LightConnection` has some pending message to read
     pub fn pending_received(&self) -> bool {
@@ -92,25 +78,45 @@ impl LightConnection {
 
 pub struct Connection<T> {
     ntt:               ntt::Connection<T>,
-    light_connections: BTreeMap<LightId, LightConnection>
+    // this is a line of active connections open by the server/client
+    // that have not been closed yet.
+    server_cons: BTreeMap<LightId, LightConnection>,
+    client_cons: BTreeMap<LightId, LightConnection>,
+    // potentialy the server close its connection before we have time
+    // to process it on the client, so keep the buffer alive here
+    server_dones: BTreeMap<LightId, LightConnection>,
+    //await_reply: BTreeMap<ntt::protocol::NodeId, >
 }
 
 impl<T: Write+Read> Connection<T> {
+
+    // search for the next free LIGHT ID in the client connection map
+    fn find_next_connection_id(&self) -> LightId {
+        let mut x = LightId(ntt::LIGHT_ID_MIN);
+        while self.client_cons.contains_key(&x) {
+            x = x.next();
+        }
+        return x;
+    }
+
     pub fn new(ntt: ntt::Connection<T>, pm: u32) -> Self {
         let mut conn = Connection {
             ntt: ntt,
-            light_connections: BTreeMap::new()
+            server_cons: BTreeMap::new(),
+            client_cons: BTreeMap::new(),
+            server_dones: BTreeMap::new(),
         };
 
-        let lcid = LightId(0x400);
-        let lc = LightConnection::new_client(lcid);
+        let lcid = conn.find_next_connection_id();
+        let lc = LightConnection::new_with_nodeid(lcid, conn.ntt.get_nonce());
         conn.ntt.create_light(lcid.0);
-        conn.light_connections.insert(lcid, lc);
+        conn.client_cons.insert(lcid, lc);
 
         // we are expecting the first broadcast to respond a connection ack
         // initial handshake
         conn.send_bytes(lcid, &packet::send_handshake(pm));
         conn.send_bytes(lcid, &packet::send_hardcoded_blob_after_handshake());
+
         conn.broadcast(); // expect ack of connection creation
         conn.broadcast(); // expect the handshake reply
         if let Some(lc) = conn.poll() {
@@ -130,8 +136,8 @@ impl<T: Write+Read> Connection<T> {
     pub fn new_light_connection(&mut self, id: LightId) {
         self.ntt.create_light(id.0);
 
-        let lc = LightConnection::new_client(id);
-        self.light_connections.insert(id, lc);
+        let lc = LightConnection::new_with_nodeid(id, self.ntt.get_nonce());
+        self.client_cons.insert(id, lc);
 
         // TODO: this is a hardcoded block sent everytime we
         // create a light connection, we might want to figure
@@ -143,23 +149,33 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {
-        let remove = if let Some(con) = self.light_connections.get_mut(&id) {
-            con.client_set_connect(false);
-            !con.server_connected && !con.client_connected
-        } else { false };
-        if remove {
-            self.light_connections.remove(&id);
-        }
+        self.client_cons.remove(&id);
     }
 
     /// get a mutable reference to a LightConnection so one can read its received data
     ///
     pub fn poll<'a>(&'a mut self) -> Option<&'a mut LightConnection> {
-        self.light_connections.iter_mut().find(|t| t.1.pending_received()).map(|t| t.1)
+        self.server_cons.iter_mut().find(|t| t.1.pending_received()).map(|t| t.1)
     }
 
     pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
         self.ntt.light_send_data(id.0, bytes)
+    }
+
+    // TODO return some kind of opaque token
+    pub fn send_bytes_ack(&mut self, id: LightId, bytes: &[u8]) -> ntt::protocol::NodeId {
+        match self.client_cons.get(&id) {
+            None => panic!("send bytes ack ERROR. connection doesn't exist"),
+            Some(con) => {
+                match con.node_id.clone() {
+                    None      => panic!("connection without node id asking for ack. internal bug"),
+                    Some(nid) => {
+                        self.ntt.light_send_data(id.0, bytes);
+                        nid
+                    }
+                }
+            }
+        }
     }
 
     pub fn broadcast(&mut self) {
@@ -167,8 +183,12 @@ impl<T: Write+Read> Connection<T> {
         match self.ntt.recv().unwrap() {
             Command::Control(ControlHeader::CloseConnection, cid) => {
                 let id = LightId::new(cid);
-                match self.light_connections.get_mut(&id) {
-                    Some(v) => v.server_set_connect(false),
+                match self.server_cons.remove(&id) {
+                    Some(v) => {
+                        if let Some(_) = v.received {
+                            self.server_dones.insert(id, v);
+                        }
+                    }
                     None    =>
                         // BUG, server asked to close connection but connection doesn't exists in tree
                         {},
@@ -176,15 +196,11 @@ impl<T: Write+Read> Connection<T> {
             },
             Command::Control(ControlHeader::CreatedNewConnection, cid) => {
                 let id = LightId::new(cid);
-                let create = if let Some(con) = self.light_connections.get_mut(&id) {
-                    con.server_set_connect(true);
-                    false
+                if let Some(_) = self.server_cons.get(&id) {
+                    panic!("light id create twice")
                 } else {
-                    true
-                };
-                if create {
-                    let con = LightConnection::new_server(id);
-                    self.light_connections.insert(id, con);
+                    let con = LightConnection::new_expecting_nodeid(id);
+                    self.server_cons.insert(id, con);
                 }
             },
             Command::Control(ch, cid) => {
@@ -193,8 +209,9 @@ impl<T: Write+Read> Connection<T> {
             ntt::protocol::Command::Data(cid, len) => {
                 let id = LightId::new(cid);
                 let bytes = self.ntt.recv_len(len).unwrap();
-                match self.light_connections.get_mut(&id) {
-                    Some(con) => con.receive(&bytes),
+                match self.server_cons.get_mut(&id) {
+                    Some(con) =>
+                        con.receive(&bytes),
                     None => {
                         println!("{}:{}: LightId({}) does not exists but received data", file!(), line!(), cid)
                     },

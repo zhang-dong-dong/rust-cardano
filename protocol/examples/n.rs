@@ -1,5 +1,6 @@
 extern crate protocol;
 extern crate wallet_crypto;
+extern crate rand;
 
 use self::protocol::ntt;
 use self::protocol::packet;
@@ -10,7 +11,7 @@ use std::net::TcpStream;
 use std::io::{Read, Write};
 
 const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
-const LIGHT_CONNECTION_ID : ntt::LightweightConnectionId = 0x401;
+//const LIGHT_CONNECTION_ID : ntt::LightweightConnectionId = 0x401;
 const PROTOCOL_MAGIC : u32 = 764824073;
 
 trait Command<W: Read+Write> {
@@ -75,10 +76,12 @@ impl<W> Command<W> for GetBlockHeader where W: Read+Write {
 
 
 fn main() {
+    let drg_seed = rand::random();
+
     let stream = TcpStream::connect(HOST).unwrap();
     stream.set_nodelay(true).unwrap();
 
-    let conn = ntt::Connection::handshake(stream).unwrap();
+    let conn = ntt::Connection::handshake(drg_seed, stream).unwrap();
     let mut connection = Connection::new(conn, PROTOCOL_MAGIC);
 
     let mut mbh = GetBlockHeader::first().execute(&mut connection, LightId::new(0x401))

@@ -124,12 +124,12 @@ pub fn send_msg_subscribe(keep_alive: bool) -> Message {
 }
 
 pub fn send_msg_getheaders(froms: &[HeaderHash], to: &Option<HeaderHash>) -> Message {
-    let mut fromEncoded = LinkedList::new();
+    let mut from_encoded = LinkedList::new();
     for f in froms {
         let b = Bytes::from_slice(f.as_ref());
-        fromEncoded.push_back(Value::Bytes(b));
+        from_encoded.push_back(Value::Bytes(b));
     }
-    let toEncoded =
+    let to_encoded =
         match to {
             &None    => Value::Array(vec![]),
             &Some(ref h) => {
@@ -137,7 +137,7 @@ pub fn send_msg_getheaders(froms: &[HeaderHash], to: &Option<HeaderHash>) -> Mes
                 Value::Array(vec![Value::Bytes(b)])
             }
         };
-    let r = Value::Array(vec![Value::IArray(fromEncoded), toEncoded]);
+    let r = Value::Array(vec![Value::IArray(from_encoded), to_encoded]);
     let dat = encode_to_cbor(&r).unwrap();
     (0x4, dat)
 }

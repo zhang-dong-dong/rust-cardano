@@ -4,7 +4,7 @@ use std::iter;
 
 pub type LightweightConnectionId = u32;
 
-const LIGHT_ID_MIN : u32 = 1024;
+pub const LIGHT_ID_MIN : u32 = 1024;
 
 pub struct EndPoint(Vec<u8>);
 impl AsRef<[u8]> for EndPoint {
@@ -19,11 +19,12 @@ impl EndPoint {
 
 pub struct Connection<W: Sized> {
     stream: W,
+    drg: u64,
 }
 
 impl<W: Sized+Write+Read> Connection<W> {
-    pub fn handshake(stream: W) -> Result<Self,&'static str> {
-        let mut conn = Connection { stream: stream };
+    pub fn handshake(drg_seed: u64, stream: W) -> Result<Self,&'static str> {
+        let mut conn = Connection { stream: stream, drg: drg_seed };
         let mut buf = vec![];
         protocol::handshake(&mut buf);
         conn.emit("handshake", &buf);
@@ -35,6 +36,12 @@ impl<W: Sized+Write+Read> Connection<W> {
             Ok(_)          => Err("unknown code"),
             Err(_)         => Err("random io error"),
         }
+    }
+
+    pub fn get_nonce(&mut self) -> protocol::Nonce {
+        let v = self.drg;
+        self.drg += 1;
+        v
     }
 
     pub fn create_light(&mut self, cid: LightweightConnectionId) {
@@ -145,12 +152,13 @@ pub mod protocol {
         Data(super::LightweightConnectionId, u32),
     }
 
-    type Nonce = u64;
+    pub type Nonce = u64;
     pub enum NodeControlHeader {
         Syn,
         Ack,
     }
 
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
     pub struct NodeId([u8;9]);
 
     impl AsRef<[u8]> for NodeId {
@@ -158,7 +166,7 @@ pub mod protocol {
     }
 
     // use make_syn_nodeid or make_ack_nodeid
-    fn make_nodeid(header: NodeControlHeader, nonce: u64) -> NodeId {
+    fn make_nodeid(header: NodeControlHeader, nonce: Nonce) -> NodeId {
         let mut v = [0;9];
         v[0] = match header {
                     NodeControlHeader::Syn => 0x53, // 'S'
@@ -176,10 +184,11 @@ pub mod protocol {
     }
 
     impl NodeId {
-        pub fn make_syn_nodeid(nonce: u64) -> Self {
+        pub fn make_syn(nonce: Nonce) -> Self {
             make_nodeid(NodeControlHeader::Syn, nonce)
         }
-        pub fn make_ack_nodeid(nonce: u64) -> Self {
+
+        pub fn make_ack(nonce: Nonce) -> Self {
             make_nodeid(NodeControlHeader::Ack, nonce)
         }
         pub fn get_control_header(&self) -> NodeControlHeader {
@@ -198,12 +207,14 @@ pub mod protocol {
     }
 
     /// encode an int32
+    /*
     fn append_i32(v: i32, buf: &mut Vec<u8>) {
         buf.push((v >> 24) as u8);
         buf.push((v >> 16) as u8);
         buf.push((v >> 8) as u8);
         buf.push(v as u8);
     }
+    */
     
     fn append_u32(v: u32, buf: &mut Vec<u8>) {
         buf.push((v >> 24) as u8);
