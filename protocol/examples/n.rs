@@ -27,71 +27,76 @@ fn main() {
     connection.broadcast();
     match connection.poll() {
         Some(lc) => {
-            assert!(lc.id() == lwc);
-            assert!(lc.connected());
+            assert!(lc.get_id() == lwc);
+            assert!(lc.client_connected());
+            assert!(lc.server_connected());
         },
-        None {
-            panic!("connection failed")
+        None => {
+            panic!("connection failed");
         }
     };
 
+    // initial handshake
     connection.send_bytes(lwc, &packet::send_handshake(PROTOCOL_MAGIC));
     connection.send_bytes(lwc, &packet::send_hardcoded_blob_after_handshake());
-
-    match connection.recv().unwrap() {
-        ntt::protocol::Command::Data(_,len)  => {
-            let dat = connection.recv_len(len);
-            println!("received data len {}", len);
+    connection.broadcast();
+    match connection.poll() {
+        Some(lc) => {
+            assert!(lc.get_id() == lwc);
+            // drop the received data.
+            let _ = lc.get_received();
         },
-        _ => println!("error")
-    }
-    //let (id, dat) = connection.recv_data().unwrap();
-    let (id, dat) = packet::send_msg_getheaders(&[], None);
-    connection.light_send_data(lwc, &[id]);
-    connection.light_send_data(lwc, &dat[..]);
+        None => {
+            panic!("connection failed");
+        }
+    };
 
-    match connection.recv().unwrap() {
-        ntt::protocol::Command::Data(_,len)  => {
-            let dat = connection.recv_len(len);
-            println!("received data len {}", len);
-        },
-        _ => println!("error")
-    }
-    match connection.recv().unwrap() {
-        ntt::protocol::Command::Data(_,len)  => {
-            let dat = connection.recv_len(len).unwrap();
-            let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
-            println!("{}", l);
-
-            match l {
-                packet::BlockHeaderResponse::Ok(ll) =>
-                    match ll.front() {
-                        Some(packet::BlockHeader::MainBlockHeader(bh)) => {
-                            println!("previous block: {}", bh.previous_header);
-                            let (id2, dat2) = packet::send_msg_getheaders(&[], Some(&bh.previous_header));
-                            connection.light_send_data(lwc, &[id2]);
-                            connection.light_send_data(lwc, &dat2[..]);
-                            match connection.recv().unwrap() {
-                                ntt::protocol::Command::Data(_,len)  => {
-                                    let dat = connection.recv_len(len).unwrap();
-                                    let x : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
-                                    println!("previous block is: {:?}", x)
-                                },
-                                ntt::protocol::Command::Control(x, y) => {
-                                    println!("control taken error {:?} {}", x, y)
-                                }
-                            }
-                        },
-                        _  => println!("error no block header"),
-                    }
+    // require the initial header
+    let (mut get_header_id, mut get_header_dat) = packet::send_msg_getheaders(&[], None);
+    let mut max_counter : usize = 2;
+    loop {
+        max_counter -= 1;
+        if max_counter == 0 { break; }
+        connection.send_bytes(lwc, &[get_header_id]);
+        connection.send_bytes(lwc, &get_header_dat[..]);
+        connection.broadcast();
+        match connection.poll() {
+            Some(lc) => {
+                assert!(lc.get_id() == lwc);
+                // drop the received data.
+                let _ = lc.get_received();
+            },
+            None => {
+                panic!("connection failed");
             }
+        };
+        connection.broadcast();
+        match connection.poll() {
+            Some(lc) => {
+                assert!(lc.get_id() == lwc);
+                if let Some(dat) = lc.get_received() {
+                    let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+                    println!("{}", l);
 
-
-            //let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
-            //println!("{}", l);
-        },
-        _ => println!("error")
+                    match l {
+                        packet::BlockHeaderResponse::Ok(ll) =>
+                            match ll.front() {
+                                Some(packet::BlockHeader::MainBlockHeader(bh)) => {
+                                    println!("previous block: {}", bh.previous_header);
+                                    let (id2, dat2) = packet::send_msg_getheaders(&[], Some(&bh.previous_header));
+                                    get_header_id = id2;
+                                    get_header_dat = dat2;
+                                },
+                                _  => println!("error no block header"),
+                            }
+                    }
+                }
+            },
+            None => {
+                panic!("connection failed");
+            }
+        };
     }
 
-    connection.close_light(lwc);
+    connection.close_light_connection(lwc);
 }

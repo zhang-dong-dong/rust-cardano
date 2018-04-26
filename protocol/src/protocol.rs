@@ -145,7 +145,7 @@ impl<T: Write+Read> Connection<T> {
         self.light_connections.iter_mut().find(|t| t.1.pending_received()).map(|t| t.1)
     }
 
-    fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
+    pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
         self.ntt.light_send_data(id.0, bytes)
     }
 
