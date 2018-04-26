@@ -120,13 +120,13 @@ impl<T: Write+Read> Connection<T> {
         // initial handshake
         conn.send_bytes(lcid, &packet::send_handshake(pm));
         conn.send_bytes(lcid, &packet::send_hardcoded_blob_after_handshake());
-        conn.broadcast();
-        conn.broadcast();
+        conn.broadcast(); // expect ack of connection creation
+        conn.broadcast(); // expect the handshake reply
         if let Some(lc) = conn.poll() {
             assert!(lc.get_id() == lcid);
             let _ = lc.get_received();
         }
-        conn.broadcast();
+        conn.broadcast(); // expect some data regarding the nodeid or something like it
         if let Some(lc) = conn.poll() {
             assert!(lc.get_id() == lcid);
             let _ = lc.get_received();
