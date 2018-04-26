@@ -154,10 +154,10 @@ impl fmt::Display for HandlerSpecs {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Handshake {
-    protocol_magic: ProtocolMagic,
-    version: Version,
-    in_handlers:  HandlerSpecs,
-    out_handlers: HandlerSpecs
+    pub protocol_magic: ProtocolMagic,
+    pub version: Version,
+    pub in_handlers:  HandlerSpecs,
+    pub out_handlers: HandlerSpecs
 }
 impl Handshake {
     pub fn new(pm: ProtocolMagic, v: Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {

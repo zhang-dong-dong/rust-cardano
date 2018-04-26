@@ -4,9 +4,11 @@ extern crate rand;
 
 use self::protocol::ntt;
 use self::protocol::packet;
+use self::protocol::packet::{Handshake};
 
 use protocol::{Connection, LightConnection, LightId};
 use wallet_crypto::cbor;
+use wallet_crypto::config::{ProtocolMagic};
 use std::net::TcpStream;
 use std::io::{Read, Write};
 
@@ -77,12 +79,13 @@ impl<W> Command<W> for GetBlockHeader where W: Read+Write {
 
 fn main() {
     let drg_seed = rand::random();
+    let mut hs = Handshake::default();
+    hs.protocol_magic = ProtocolMagic::new(PROTOCOL_MAGIC);
 
     let stream = TcpStream::connect(HOST).unwrap();
     stream.set_nodelay(true).unwrap();
 
     let conn = ntt::Connection::handshake(drg_seed, stream).unwrap();
-    let hs = packet::Handshake::default();
     let mut connection = Connection::new(conn, &hs);
 
     let mut mbh = GetBlockHeader::first().execute(&mut connection, LightId::new(0x401))
