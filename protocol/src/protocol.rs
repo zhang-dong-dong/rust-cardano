@@ -34,15 +34,6 @@ pub struct LightConnection {
     received: Option<Vec<u8>>
 }
 impl LightConnection {
-    /// create a new `LightConnection` from the given `LightId`
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use protocol::{LightId, LightConnection};
-    /// let id = LightId::new(0x400);
-    /// let lcon = LightConnection::new(id);
-    /// ```
     pub fn new_server(id: LightId) -> Self {
         LightConnection {
             id: id,
