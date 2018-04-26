@@ -223,6 +223,7 @@ type Message = (u8, Vec<u8>);
 
 const HASH_SIZE : usize = 32;
 // TODO move to another crate/module
+#[derive(Clone)]
 pub struct HeaderHash([u8;HASH_SIZE]);
 impl AsRef<[u8]> for HeaderHash { fn as_ref(&self) -> &[u8] { self.0.as_ref() } }
 impl fmt::Debug for HeaderHash {
@@ -429,6 +430,149 @@ impl cbor::CborValue for BlockHeaderResponse {
                 let (array, l) = cbor::array_decode_elem(array, 0)?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(BlockHeaderResponse::Ok(l))
+            } else {
+                cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
+            }
+        })
+    }
+}
+
+pub mod block {
+    pub mod main {
+        use super::super::*;
+        use wallet_crypto::{tx, cbor};
+
+        #[derive(Debug)]
+        pub struct TxPayload {
+            txs: LinkedList<tx::Tx>,
+            witnesses: LinkedList<Vec<tx::TxInWitness>>
+        }
+        impl TxPayload {
+            pub fn new(txs: LinkedList<tx::Tx>, wts: LinkedList<Vec<tx::TxInWitness>>) -> Self {
+                TxPayload { txs: txs, witnesses: wts }
+            }
+            pub fn empty() -> Self {
+                TxPayload::new(LinkedList::new(), LinkedList::new())
+            }
+        }
+        impl cbor::CborValue for TxPayload {
+            fn encode(&self) -> cbor::Value {
+               unimplemented!()
+            }
+            fn decode(value: cbor::Value) -> cbor::Result<Self> {
+                value.iarray().and_then(|array| {
+                    if ! array.is_empty() { return cbor::Result::iarray(array, cbor::Error::UnparsedValues); }
+                    Ok(TxPayload::empty())
+                }).embed("While decoding TxPayload")
+            }
+        }
+
+        #[derive(Debug)]
+        pub struct Body {
+            tx: TxPayload, // { [tx::Tx], [tx::TxWitnesses] }
+            scc: Todo,
+            delegation: Todo,
+            update: Todo
+        }
+        impl Body {
+            pub fn new(tx: TxPayload, scc: Todo, dlg: Todo, upd: Todo) -> Self {
+                Body { tx: tx, scc: scc, delegation: dlg, update: upd }
+            }
+        }
+        impl cbor::CborValue for Body {
+            fn encode(&self) -> cbor::Value {
+               unimplemented!()
+            }
+            fn decode(value: cbor::Value) -> cbor::Result<Self> {
+                value.array().and_then(|array| {
+                    let (array, tx)  = cbor::array_decode_elem(array, 0).embed("tx")?;
+                    let (array, scc) = cbor::array_decode_elem(array, 0).embed("scc")?;
+                    let (array, dlg) = cbor::array_decode_elem(array, 0).embed("dlg")?;
+                    let (array, upd) = cbor::array_decode_elem(array, 0).embed("update")?;
+                    if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                    Ok(Body::new(tx, scc, dlg, upd))
+                }).embed("While decoding Body")
+            }
+        }
+
+        #[derive(Debug)]
+        pub struct Block {
+            header: BlockHeader,
+            body: Body,
+            extra: Todo
+        }
+        impl Block {
+            pub fn new(h: BlockHeader, b: Body, e: Todo) -> Self {
+                Block { header: h, body: b, extra: e }
+            }
+        }
+        impl cbor::CborValue for Block {
+            fn encode(&self) -> cbor::Value {
+               unimplemented!()
+            }
+            fn decode(value: cbor::Value) -> cbor::Result<Self> {
+                value.array().and_then(|array| {
+                    let (array, header) = cbor::array_decode_elem(array, 0).embed("header")?;
+                    let (array, body)   = cbor::array_decode_elem(array, 0).embed("body")?;
+                    let (array, extra)  = cbor::array_decode_elem(array, 0).embed("extra")?;
+                    if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                    Ok(Block::new(header, body, extra))
+                }).embed("While decoding block::Block")
+            }
+        }
+    }
+
+    use super::*;
+    use wallet_crypto::{cbor};
+
+    #[derive(Debug)]
+    pub enum Block {
+        MainBlock(main::Block)
+    }
+
+    impl cbor::CborValue for Block {
+        fn encode(&self) -> cbor::Value {
+            unimplemented!()
+        }
+        fn decode(value: cbor::Value) -> cbor::Result<Self> {
+            value.array().and_then(|array| {
+                let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+                // if code == 0u64 { TODO: support genesis::Block
+                if code == 1u64 {
+                    let (array, blk) = cbor::array_decode_elem(array, 0)?;
+                    if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                    Ok(Block::MainBlock(blk))
+                } else {
+                    cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
+                }
+            }).embed("While decoding block::Block")
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum BlockResponse {
+    Ok(block::Block)
+}
+impl cbor::CborValue for BlockResponse {
+    fn encode(&self) -> cbor::Value {
+        match self {
+            &BlockResponse::Ok(ref l) => {
+                cbor::Value::Array(
+                   vec![ cbor::Value::U64(0)
+                       , cbor::CborValue::encode(l)
+                       ]
+                )
+            }
+        }
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+            if code == 0u64 {
+                let (array, l) = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(BlockResponse::Ok(l))
             } else {
                 cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
             }

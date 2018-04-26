@@ -646,8 +646,8 @@ pub mod fee {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TxAux {
-    tx: Tx,
-    witnesses: Vec<TxInWitness>,
+    pub tx: Tx,
+    pub witnesses: Vec<TxInWitness>,
 }
 impl TxAux {
     pub fn new(tx: Tx, witnesses: Vec<TxInWitness>) -> Self {
