@@ -246,6 +246,7 @@ pub fn pack_blobs(storage: &mut Storage) -> PackHash {
     tmpfile.render_permanent(&storage.config.get_index_filepath(&packhash));
 
     for bh in block_hashes.iter() {
+        // commented since we don't read from pack yet
         //blob::remove(storage, bh);
     }
 
@@ -422,8 +423,6 @@ pub mod pack {
     }
 
     pub fn search_index(mut file: &fs::File, blk: &super::BlockHash, start_elements: FanoutStart, hier_elements: FanoutNb) -> Option<IndexOffset> {
-
-        let start = IDX_OFS_HASHES;
         match hier_elements.0 {
             0 => None,
             1 => {
