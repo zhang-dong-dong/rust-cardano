@@ -237,6 +237,7 @@ impl fmt::Display for HeaderHash {
     }
 }
 impl HeaderHash {
+    pub fn bytes<'a>(&'a self) -> &'a [u8;HASH_SIZE] { &self.0 }
     pub fn from_bytes(bytes :[u8;HASH_SIZE]) -> Self { HeaderHash(bytes) }
     pub fn from_slice(bytes: &[u8]) -> Option<Self> {
         if bytes.len() != HASH_SIZE { return None; }

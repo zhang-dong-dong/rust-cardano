@@ -2,7 +2,7 @@ use wallet_crypto::util::{hex, base58};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage};
+use storage::{Storage, blob};
 use rand;
 use std::net::TcpStream;
 
@@ -52,9 +52,10 @@ impl HasCommand for Network {
                 let hh_bytes = hex::decode(&hh_hex);
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let mut net = Network::new(&config);
-                let mut b = GetBlock::only(hh).execute(&mut net.0)
+                let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");
-                println!("block: {:?}", b);
+                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                blob::write(&storage, hh.bytes(), &b);
             },
             _ => {
                 println!("{}", args.usage());
