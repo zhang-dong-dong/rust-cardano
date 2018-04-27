@@ -164,6 +164,7 @@ pub mod pack {
 
     type Offset = u64;
     type Size = u64;
+    type IndexOffset = u64;
 
     type Entry = (super::BlockHash, Size);
 
@@ -224,6 +225,12 @@ pub mod pack {
         let mut buf = [0u8;8];
         file.read_exact(&mut buf).unwrap();
         read_size(&buf)
+    }
+
+    fn file_read_hash(mut file: &fs::File) -> super::BlockHash {
+        let mut buf = [0u8;super::HASH_SIZE];
+        file.read_exact(&mut buf).unwrap();
+        buf
     }
 
     pub fn create_index(storage: &super::Storage, index: &Index) -> super::TmpFile {
@@ -289,6 +296,45 @@ pub mod pack {
             fanout[i] = read_size(&buf[ofs..ofs+8])
         }
         Fanout(fanout)
+    }
+
+    pub fn search_index(mut file: &fs::File, blk: &super::BlockHash, start_elements: FanoutStart, hier_elements: FanoutNb) -> Option<IndexOffset> {
+
+        let start = IDX_OFS_HASHES;
+        match hier_elements.0 {
+            0 => None,
+            1 => {
+                let ofsElement = start_elements.0;
+                let ofs = ofsElement * super::HASH_SIZE as u64;
+                file.seek(SeekFrom::Start(IDX_OFS_HASHES + ofsElement)).unwrap();
+                let hash = file_read_hash(file);
+                if &hash == blk { Some(ofsElement) } else { None }
+            },
+            2 => {
+                let start = start_elements.0;
+                let ofsElement = start_elements.0;
+                let ofs = ofsElement * super::HASH_SIZE as u64;
+                file.seek(SeekFrom::Start(IDX_OFS_HASHES + ofsElement)).unwrap();
+                let hash = file_read_hash(file);
+                let hash2 = file_read_hash(file);
+                if &hash == blk { Some(ofsElement) } else if &hash2 == blk { Some(ofsElement+1) } else { None }
+            },
+            n => {
+                let start = start_elements.0;
+                let end = start_elements.0 + n;
+                let mut ofsElement = start;
+                let ofs = ofsElement * super::HASH_SIZE as u64;
+                file.seek(SeekFrom::Start(IDX_OFS_HASHES + ofsElement)).unwrap();
+                while ofsElement < end {
+                    let hash = file_read_hash(file);
+                    if &hash == blk {
+                        return Some(ofsElement)
+                    }
+                    ofsElement += 1
+                }
+                None
+            },
+        }
     }
 
 /*
