@@ -10,6 +10,7 @@ mod config;
 mod account;
 mod command;
 mod wallet;
+mod storage;
 
 use config::{Config};
 use command::{HasCommand};
