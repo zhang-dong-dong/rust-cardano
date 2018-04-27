@@ -8,7 +8,7 @@ use std::fs::OpenOptions;
 use wallet_crypto::util::hex::{encode};
 //use wallet_crypto::util::hex::{decode};
 
-extern crate rcw;
+use rcw;
 
 use rand;
 

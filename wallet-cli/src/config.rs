@@ -6,18 +6,26 @@ use account::{Account};
 use wallet::{Wallet};
 use command::{HasCommand};
 
+use wallet_crypto::config::{ProtocolMagic};
+
 /// Configuration file for the Wallet CLI
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub accounts: Vec<Account>,
-    pub wallet: Option<Wallet>
+    pub wallet: Option<Wallet>,
+    pub network_type: String,
+    pub newtork_domain: String,
+    pub protocol_magic: ProtocolMagic
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             accounts: vec![Account::default()],
-            wallet: None
+            wallet: None,
+            network_type: "mainnet".to_string(),
+            newtork_domain: "relays.cardano-mainnet.iohk.io:3000".to_string(),
+            protocol_magic: ProtocolMagic::default()
         }
     }
 }

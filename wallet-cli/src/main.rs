@@ -3,6 +3,7 @@ extern crate clap;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_yaml;
+extern crate rcw;
 extern crate wallet_crypto;
 extern crate rand;
 
