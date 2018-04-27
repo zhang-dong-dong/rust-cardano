@@ -115,8 +115,6 @@ impl<W> Command<W> for GetBlock where W: Read+Write {
                 assert!(lc.get_id() == id);
                 if let Some(dat) = lc.get_received() {
                     let mut l : packet::BlockResponse = cbor::decode_from_cbor(&dat).unwrap();
-                    println!("{:?}", l);
-
                     match l {
                         packet::BlockResponse::Ok(resp) => Ok(resp),
                     }

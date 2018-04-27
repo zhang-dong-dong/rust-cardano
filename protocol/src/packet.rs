@@ -470,12 +470,12 @@ pub mod block {
         #[derive(Debug)]
         pub struct Body {
             tx: TxPayload, // { [tx::Tx], [tx::TxWitnesses] }
-            scc: Todo,
-            delegation: Todo,
-            update: Todo
+            scc: cbor::Value,
+            delegation: cbor::Value,
+            update: cbor::Value
         }
         impl Body {
-            pub fn new(tx: TxPayload, scc: Todo, dlg: Todo, upd: Todo) -> Self {
+            pub fn new(tx: TxPayload, scc: cbor::Value, dlg: cbor::Value, upd: cbor::Value) -> Self {
                 Body { tx: tx, scc: scc, delegation: dlg, update: upd }
             }
         }
@@ -499,10 +499,10 @@ pub mod block {
         pub struct Block {
             header: MainBlockHeader,
             body: Body,
-            extra: Todo
+            extra: cbor::Value
         }
         impl Block {
-            pub fn new(h: MainBlockHeader, b: Body, e: Todo) -> Self {
+            pub fn new(h: MainBlockHeader, b: Body, e: cbor::Value) -> Self {
                 Block { header: h, body: b, extra: e }
             }
         }
