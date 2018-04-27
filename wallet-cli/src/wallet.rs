@@ -4,6 +4,7 @@ use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use account::{Account};
+use storage::{Storage};
 use rand;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,6 +29,9 @@ impl HasCommand for Wallet {
             .subcommand(SubCommand::with_name("generate")
                 .about("generate a new wallet")
             )
+            .subcommand(SubCommand::with_name("init")
+                .about("initialise the storage associated to the given wallet")
+            )
             .subcommand(SubCommand::with_name("address")
                 .about("create an address with the given options")
                 .arg(Arg::with_name("is_internal").long("internal").help("to generate an internal address (see BIP44)"))
@@ -46,6 +50,11 @@ impl HasCommand for Wallet {
                 assert!(cfg.wallet.is_none());
                 cfg.wallet = Some(Wallet::generate());
                 Some(cfg) // we need to update the config's wallet
+            },
+            ("init", _) => {
+                assert!(cfg.wallet.is_some());
+                Storage::init(cfg.storage, cfg.network_type).unwrap();
+                None
             },
             ("address", Some(opts)) => {
                 // expect existing wallet

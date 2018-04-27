@@ -1,4 +1,5 @@
-use std::path::{Path};
+use std::path::{Path, PathBuf};
+use std::env::{home_dir};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use serde_yaml;
 
@@ -15,17 +16,21 @@ pub struct Config {
     pub wallet: Option<Wallet>,
     pub network_type: String,
     pub newtork_domain: String,
-    pub protocol_magic: ProtocolMagic
+    pub protocol_magic: ProtocolMagic,
+    pub storage: PathBuf
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let mut storage_dir = home_dir().unwrap();
+        storage_dir.push(".ariadne");
         Config {
             accounts: vec![Account::default()],
             wallet: None,
             network_type: "mainnet".to_string(),
             newtork_domain: "relays.cardano-mainnet.iohk.io:3000".to_string(),
-            protocol_magic: ProtocolMagic::default()
+            protocol_magic: ProtocolMagic::default(),
+            storage: storage_dir,
         }
     }
 }
