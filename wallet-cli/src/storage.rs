@@ -167,7 +167,37 @@ pub mod pack {
 
     type Entry = (super::BlockHash, Size);
 
-    type Fanout = [u64;256];
+    pub struct Fanout([u64;256]);
+    pub struct FanoutStart(u64);
+    pub struct FanoutNb(u64);
+
+    impl Fanout {
+        pub fn get_class_nb_by_hash(&self, hash: &super::BlockHash) -> u64 {
+            match hash[0] as usize {
+                0 => self.0[0],
+                c => self.0[c] - self.0[c-1]
+            }
+        }
+        pub fn get_class_nb(&self, class: u8) -> u64 {
+            match class as usize {
+                0 => self.0[0],
+                c => self.0[c] - self.0[c-1]
+            }
+        }
+        pub fn get_indexer_by_hash(&self, hash: &super::BlockHash) -> (FanoutStart, FanoutNb) {
+            self.get_indexer_by_hier(hash[0])
+        }
+
+        pub fn get_indexer_by_hier(&self, hier: u8) -> (FanoutStart, FanoutNb) {
+            match hier as usize {
+                0 => (FanoutStart(0), FanoutNb(self.0[0])),
+                c => {
+                    let start = self.0[c-1];
+                    (FanoutStart(start), FanoutNb(self.0[c] - start))
+                },
+            }
+        }
+    }
 
     fn write_size(buf: &mut [u8], sz: Size) {
         buf[0] = (sz >> 56) as u8;
@@ -214,9 +244,12 @@ pub mod pack {
         }
 
         let mut fanout_buf = [0u8;256*8];
+        let mut fanout_sum = 0;
         for i in 0..256 {
             let ofs = i * 8;
-            write_size(&mut fanout_buf[ofs..ofs+8], fanout[i]);
+            let abs = fanout[i];
+            fanout_sum += abs;
+            write_size(&mut fanout_buf[ofs..ofs+8], fanout_sum);
         }
         tmpfile.file.write_all(&fanout_buf).unwrap();
 
@@ -230,8 +263,6 @@ pub mod pack {
             tmpfile.file.write_all(&hash[..]).unwrap();
         }
 
-        let offsets : &[Offset] = &[];
-        
         for &(_, ofs) in sorted.iter() {
             let mut buf = [0u8;8];
             write_size(&mut buf, ofs);
@@ -251,7 +282,7 @@ pub mod pack {
             let ofs = i*8;
             fanout[i] = read_size(&buf[ofs..ofs+8])
         }
-        fanout
+        Fanout(fanout)
     }
 
 /*
