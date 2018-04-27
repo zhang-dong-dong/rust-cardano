@@ -46,14 +46,7 @@ impl Hash {
 }
 impl fmt::Display for Hash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.iter().for_each(|byte| {
-            if byte < &0x10 {
-                write!(f, "0{:x}", byte).unwrap()
-            } else {
-                write!(f, "{:x}", byte).unwrap()
-            }
-        });
-        Ok(())
+        write!(f, "{}", hex::encode(&self.0[..]))
     }
 }
 impl cbor::CborValue for Hash {
@@ -141,6 +134,11 @@ impl Coin {
         if v <= MAX_COIN { Some(Coin(v)) } else { None }
     }
 }
+impl fmt::Display for Coin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 impl cbor::CborValue for Coin {
     fn encode(&self) -> cbor::Value { cbor::Value::U64(self.0) }
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
@@ -191,6 +189,11 @@ pub struct TxOut {
     pub address: ExtendedAddr,
     pub value: Coin,
 }
+impl fmt::Display for TxOut {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} -> {}", self.address, self.value)
+    }
+}
 impl TxOut {
     pub fn new(addr: ExtendedAddr, value: Coin) -> Self {
         TxOut { address: addr, value: value }
@@ -230,6 +233,11 @@ pub enum TxInWitness {
     PkWitness(XPub, Signature<Tx>),
     ScriptWitness(ValidatorScript, RedeemerScript),
     RedeemWitness(RedeemPublicKey, RedeemSignature),
+}
+impl fmt::Display for TxInWitness {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 impl TxInWitness {
     /// create a TxInWitness from a given private key `XPrv` for the given transaction `Tx`.
@@ -326,6 +334,11 @@ pub struct TxIn {
     pub id: TxId,
     pub index: u32,
 }
+impl fmt::Display for TxIn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}@{}", self.id, self.index)
+    }
+}
 impl TxIn {
     pub fn new(id: TxId, index: u32) -> Self { TxIn { id: id, index: index } }
 }
@@ -362,6 +375,17 @@ pub struct Tx {
     // attributes: TxAttributes
     //
     // So far, there is no TxAttributes... the structure contains only the unparsed/unknown stuff
+}
+impl fmt::Display for Tx {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for input in self.inputs.iter() {
+            writeln!(f, "-> {}", input)?;
+        }
+        for output in self.outputs.iter() {
+            writeln!(f, "   {} ->", output)?;
+        }
+        write!(f, "")
+    }
 }
 impl Tx {
     pub fn new() -> Self { Tx::new_with(LinkedList::new(), LinkedList::new()) }
@@ -648,6 +672,12 @@ pub mod fee {
 pub struct TxAux {
     pub tx: Tx,
     pub witnesses: Vec<TxInWitness>,
+}
+impl fmt::Display for TxAux {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Tx:\n{}", self.tx)?;
+        writeln!(f, "witnesses: {:?}\n", self.witnesses)
+    }
 }
 impl TxAux {
     pub fn new(tx: Tx, witnesses: Vec<TxInWitness>) -> Self {

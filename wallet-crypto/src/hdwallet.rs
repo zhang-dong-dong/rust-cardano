@@ -189,14 +189,12 @@ impl PartialEq for XPrv {
 impl Eq for XPrv {}
 impl fmt::Debug for XPrv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for b in self.as_ref().iter() {
-            if b < &0x10 {
-                write!(f, "0{:x}", b)?;
-            } else {
-                write!(f, "{:x}", b)?;
-            }
-        }
-        Ok(())
+        write!(f, "{}", hex::encode(self.as_ref()))
+    }
+}
+impl fmt::Display for XPrv {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.as_ref()))
     }
 }
 impl AsRef<[u8]> for XPrv {
@@ -314,16 +312,14 @@ impl PartialEq for XPub {
     fn eq(&self, rhs: &XPub) -> bool { fixed_time_eq(self.as_ref(), rhs.as_ref()) }
 }
 impl Eq for XPub {}
+impl fmt::Display for XPub {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.as_ref()))
+    }
+}
 impl fmt::Debug for XPub {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for b in self.as_ref().iter() {
-            if b < &0x10 {
-                write!(f, "0{:x}", b)?;
-            } else {
-                write!(f, "{:x}", b)?;
-            }
-        }
-        Ok(())
+        write!(f, "{}", hex::encode(self.as_ref()))
     }
 }
 impl AsRef<[u8]> for XPub {
@@ -412,16 +408,14 @@ impl<T> PartialEq for Signature<T> {
     fn eq(&self, rhs: &Signature<T>) -> bool { fixed_time_eq(self.as_ref(), rhs.as_ref()) }
 }
 impl<T> Eq for Signature<T> {}
+impl<T> fmt::Display for Signature<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.as_ref()))
+    }
+}
 impl<T> fmt::Debug for Signature<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for b in self.as_ref().iter() {
-            if b < &0x10 {
-                write!(f, "0{:x}", b)?;
-            } else {
-                write!(f, "{:x}", b)?;
-            }
-        }
-        Ok(())
+        write!(f, "{}", hex::encode(self.as_ref()))
     }
 }
 impl<T> AsRef<[u8]> for Signature<T> {

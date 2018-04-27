@@ -442,12 +442,21 @@ pub mod block {
     pub mod main {
         use super::super::*;
         use wallet_crypto::{tx, cbor};
+        use std::{fmt};
 
         #[derive(Debug)]
         pub struct TxPayload {
             txaux: LinkedList<tx::TxAux>
             // txs: LinkedList<tx::Tx>,
             // witnesses: LinkedList<Vec<tx::TxInWitness>>
+        }
+        impl fmt::Display for TxPayload {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                for txaux in self.txaux.iter() {
+                    writeln!(f, "{}", txaux)?;
+                }
+                write!(f, "")
+            }
         }
         impl TxPayload {
             // pub fn new(txs: LinkedList<tx::Tx>, wts: LinkedList<Vec<tx::TxInWitness>>) -> Self {
@@ -488,6 +497,11 @@ pub mod block {
                 Body { tx: tx, scc: scc, delegation: dlg, update: upd }
             }
         }
+        impl fmt::Display for Body {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{}", self.tx)
+            }
+        }
         impl cbor::CborValue for Body {
             fn encode(&self) -> cbor::Value {
                unimplemented!()
@@ -515,6 +529,12 @@ pub mod block {
                 Block { header: h, body: b, extra: e }
             }
         }
+        impl fmt::Display for Block {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                writeln!(f, "{:?}", self.header)?;
+                write!(f, "{}", self.body)
+            }
+        }
         impl cbor::CborValue for Block {
             fn encode(&self) -> cbor::Value {
                unimplemented!()
@@ -537,6 +557,13 @@ pub mod block {
     #[derive(Debug)]
     pub enum Block {
         MainBlock(main::Block)
+    }
+    impl fmt::Display for Block {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                &Block::MainBlock(ref blk) => write!(f, "{}", blk)
+            }
+        }
     }
 
     impl cbor::CborValue for Block {

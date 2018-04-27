@@ -6,7 +6,7 @@ use rcw::digest::Digest;
 use rcw::blake2b::Blake2b;
 use rcw::sha3::Sha3;
 
-use util::base58;
+use util::{base58};
 use cbor;
 use cbor::{ExtendedResult};
 use hdwallet::{XPub};
@@ -353,7 +353,7 @@ impl cbor::CborValue for ExtendedAddr {
 }
 impl fmt::Display for ExtendedAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
+        write!(f, "{}", base58::encode(&self.to_bytes()))
     }
 }
 impl serde::Serialize for ExtendedAddr
