@@ -130,7 +130,7 @@ impl<W> Command<W> for GetBlock where W: Read+Write {
     }
 }
 
-const MAX_ALLOWED_ITERATIONS : u32 = 5;
+const MAX_ALLOWED_ITERATIONS : u32 = 10;
 
 fn main() {
     let drg_seed = rand::random();
@@ -159,12 +159,15 @@ fn main() {
             println!("prv block header: {}", mbh.previous_header);
         };
 
-        current += 1;
-        {
-            let id = 0x400 + current;
-            let blk = GetBlock::only(mbh.previous_header.clone())
-                .execute(&mut connection, LightId::new(id)).expect("to get a block");
-            println!("Block: {:?}", blk);
-        };
     }
+
+    let prev_blk_id = mbh.previous_header;
+    // example below works on mainnet only:
+    // let prev_block_id = packet::HeaderHash::from_bytes([0x42, 0x88, 0xff, 0xec, 0x11, 0x22, 0x10, 0x6d, 0xf4, 0x4c, 0xcf, 0x12, 0xfc, 0xfb, 0xde, 0x44, 0xdb, 0xe0, 0x7d, 0x24, 0x5d, 0xba, 0x06, 0x23, 0xba, 0xb8, 0xb8, 0x63, 0xa7, 0x04, 0x85, 0x64]);
+    {
+        let id = 0x400 + current;
+        let blk = GetBlock::only(prev_blk_id)
+            .execute(&mut connection, LightId::new(id)).expect("to get a block");
+        println!("Block: {:?}", blk);
+    };
 }
