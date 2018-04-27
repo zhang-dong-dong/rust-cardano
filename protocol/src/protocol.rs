@@ -89,6 +89,8 @@ pub struct Connection<T> {
     // to process it on the client, so keep the buffer alive here
     server_dones: BTreeMap<LightId, LightConnection>,
     //await_reply: BTreeMap<ntt::protocol::NodeId, >
+
+    next_light_id: LightId
 }
 
 impl<T: Write+Read> Connection<T> {
@@ -102,12 +104,19 @@ impl<T: Write+Read> Connection<T> {
         return x;
     }
 
+    fn get_free_light_id(&mut self) -> LightId {
+        let id = self.next_light_id;
+        self.next_light_id = id.next();
+        id
+    }
+
     pub fn new(ntt: ntt::Connection<T>, hs: &packet::Handshake) -> Self {
         let mut conn = Connection {
             ntt: ntt,
             server_cons: BTreeMap::new(),
             client_cons: BTreeMap::new(),
             server_dones: BTreeMap::new(),
+            next_light_id: LightId::new(0x401)
         };
 
         let lcid = conn.find_next_connection_id();
@@ -228,4 +237,123 @@ impl<T: Write+Read> Connection<T> {
             },
         }
     }
+}
+
+pub mod command {
+    use std::io::{Read, Write};
+    use super::{LightId, Connection};
+    use wallet_crypto::cbor;
+    use packet;
+
+    pub trait Command<W: Read+Write> {
+        type Output;
+        fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str>;
+
+        fn execute(&self, connection: &mut Connection<W>) -> Result<Self::Output, &'static str> {
+            let id = connection.get_free_light_id();
+
+            connection.new_light_connection(id);
+            connection.broadcast(); // expect ack of connection creation
+
+            let ret = self.cmd(connection, id)?;
+
+            connection.close_light_connection(id);
+
+            Ok(ret)
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct GetBlockHeader(Option<packet::HeaderHash>);
+    impl GetBlockHeader {
+        pub fn first() -> Self { GetBlockHeader(None) }
+        pub fn some(hh: packet::HeaderHash) -> Self { GetBlockHeader(Some(hh)) }
+    }
+
+    impl<W> Command<W> for GetBlockHeader where W: Read+Write {
+        type Output = packet::MainBlockHeader;
+        fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
+            // require the initial header
+            let (get_header_id, get_header_dat) = packet::send_msg_getheaders(&[], &self.0);
+            connection.send_bytes(id, &[get_header_id]);
+            connection.send_bytes(id, &get_header_dat[..]);
+            connection.broadcast();
+            match connection.poll_id(id) {
+                Some(lc) => {
+                    let _ = lc.get_received();
+                },
+                None => {
+                    panic!("connection failed");
+                }
+            };
+            connection.broadcast();
+            match connection.poll_id(id) {
+                Some(lc) => {
+                    assert!(lc.get_id() == id);
+                    if let Some(dat) = lc.get_received() {
+                        let mut l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+                        println!("{}", l);
+    
+                        match l {
+                            packet::BlockHeaderResponse::Ok(mut ll) =>
+                                match ll.pop_front() {
+                                    Some(packet::BlockHeader::MainBlockHeader(bh)) => Ok(bh),
+                                    _  => Err("No first main block header")
+                                }
+                        }
+                    } else { Err("No received data...") }
+                },
+                None => {
+                    panic!("connection failed");
+                }
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct GetBlock {
+        from: packet::HeaderHash,
+        to:   packet::HeaderHash
+    }
+    impl GetBlock {
+        pub fn only(hh: packet::HeaderHash) -> Self { GetBlock::from(hh.clone(), hh) }
+        pub fn from(from: packet::HeaderHash, to: packet::HeaderHash) -> Self { GetBlock { from: from, to: to } }
+    }
+
+    impl<W> Command<W> for GetBlock where W: Read+Write {
+        type Output = packet::block::Block;
+        fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
+            // require the initial header
+            let (get_header_id, get_header_dat) = packet::send_msg_getblocks(&self.from, &self.to);
+            connection.send_bytes(id, &[get_header_id]);
+            connection.send_bytes(id, &get_header_dat[..]);
+            connection.broadcast();
+            match connection.poll_id(id) {
+                Some(lc) => {
+                    assert_eq!(lc.get_id(), id);
+                    // drop the received data.
+                    let _ = lc.get_received();
+                },
+                None => {
+                    panic!("connection failed");
+                }
+            };
+            connection.broadcast();
+            match connection.poll_id(id) {
+                Some(lc) => {
+                    assert!(lc.get_id() == id);
+                    if let Some(dat) = lc.get_received() {
+                        let mut l : packet::BlockResponse = cbor::decode_from_cbor(&dat).unwrap();
+                        match l {
+                            packet::BlockResponse::Ok(resp) => Ok(resp),
+                        }
+                    } else { Err("No received data...") }
+                },
+                None => {
+                    panic!("connection failed");
+                }
+            }
+        }
+    }
+
 }

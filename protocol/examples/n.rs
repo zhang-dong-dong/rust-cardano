@@ -2,15 +2,13 @@ extern crate protocol;
 extern crate wallet_crypto;
 extern crate rand;
 
-use self::protocol::ntt;
-use self::protocol::packet;
-use self::protocol::packet::{Handshake};
+use protocol::packet::{Handshake};
 
-use protocol::{Connection, LightConnection, LightId};
-use wallet_crypto::cbor;
+use protocol::command::{Command};
+
+use protocol::{command, ntt, Connection};
 use wallet_crypto::config::{ProtocolMagic};
 use std::net::TcpStream;
-use std::io::{Read, Write};
 
 // mainnet:
 // const HOST: &'static str = "relays.cardano-mainnet.iohk.io:3000";
@@ -19,116 +17,6 @@ use std::io::{Read, Write};
 // staging:
 const HOST: &'static str = "relays.awstest.iohkdev.io:3000";
 const PROTOCOL_MAGIC : u32 = 633343913;
-
-trait Command<W: Read+Write> {
-    type Output;
-    fn execute(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str>;
-}
-
-#[derive(Debug)]
-struct GetBlockHeader(Option<packet::HeaderHash>);
-impl GetBlockHeader {
-    fn first() -> Self { GetBlockHeader(None) }
-    fn some(hh: packet::HeaderHash) -> Self { GetBlockHeader(Some(hh)) }
-}
-
-impl<W> Command<W> for GetBlockHeader where W: Read+Write {
-    type Output = packet::MainBlockHeader;
-    fn execute(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
-        connection.new_light_connection(id);
-        connection.broadcast(); // expect ack of connection creation
-
-        // require the initial header
-        let (get_header_id, get_header_dat) = packet::send_msg_getheaders(&[], &self.0);
-        connection.send_bytes(id, &[get_header_id]);
-        connection.send_bytes(id, &get_header_dat[..]);
-        connection.broadcast();
-        match connection.poll_id(id) {
-            Some(lc) => {
-                let _ = lc.get_received();
-            },
-            None => {
-                panic!("connection failed");
-            }
-        };
-        connection.broadcast();
-        let rep = match connection.poll_id(id) {
-            Some(lc) => {
-                assert!(lc.get_id() == id);
-                if let Some(dat) = lc.get_received() {
-                    let mut l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
-                    println!("{}", l);
-
-                    match l {
-                        packet::BlockHeaderResponse::Ok(mut ll) =>
-                            match ll.pop_front() {
-                                Some(packet::BlockHeader::MainBlockHeader(bh)) => Ok(bh),
-                                _  => Err("No first main block header")
-                            }
-                    }
-                } else { Err("No received data...") }
-            },
-            None => {
-                panic!("connection failed");
-            }
-        };
-        connection.close_light_connection(id);
-
-        rep
-    }
-}
-
-#[derive(Debug)]
-struct GetBlock {
-    from: packet::HeaderHash,
-    to:   packet::HeaderHash
-}
-impl GetBlock {
-    fn only(hh: packet::HeaderHash) -> Self { GetBlock::from(hh.clone(), hh) }
-    fn from(from: packet::HeaderHash, to: packet::HeaderHash) -> Self { GetBlock { from: from, to: to } }
-}
-
-impl<W> Command<W> for GetBlock where W: Read+Write {
-    type Output = packet::block::Block;
-    fn execute(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
-        connection.new_light_connection(id);
-        connection.broadcast(); // expect ack of connection creation
-
-        // require the initial header
-        let (get_header_id, get_header_dat) = packet::send_msg_getblocks(&self.from, &self.to);
-        connection.send_bytes(id, &[get_header_id]);
-        connection.send_bytes(id, &get_header_dat[..]);
-        connection.broadcast();
-        match connection.poll_id(id) {
-            Some(lc) => {
-                assert_eq!(lc.get_id(), id);
-                // drop the received data.
-                let _ = lc.get_received();
-            },
-            None => {
-                panic!("connection failed");
-            }
-        };
-        connection.broadcast();
-        let rep = match connection.poll_id(id) {
-            Some(lc) => {
-                assert!(lc.get_id() == id);
-                if let Some(dat) = lc.get_received() {
-                    let mut l : packet::BlockResponse = cbor::decode_from_cbor(&dat).unwrap();
-                    match l {
-                        packet::BlockResponse::Ok(resp) => Ok(resp),
-                    }
-                } else { Err("No received data...") }
-            },
-            None => {
-                panic!("connection failed");
-            }
-        };
-        connection.close_light_connection(id);
-
-        rep
-    }
-}
 
 const MAX_ALLOWED_ITERATIONS : u32 = 10;
 
@@ -143,7 +31,7 @@ fn main() {
     let conn = ntt::Connection::handshake(drg_seed, stream).unwrap();
     let mut connection = Connection::new(conn, &hs);
 
-    let mut mbh = GetBlockHeader::first().execute(&mut connection, LightId::new(0x401))
+    let mut mbh = command::GetBlockHeader::first().execute(&mut connection)
         .expect("to get one header at least");
     println!("prv block header: {}", mbh.previous_header);
 
@@ -153,9 +41,8 @@ fn main() {
         if current > (2 + MAX_ALLOWED_ITERATIONS) { break; }
 
         {
-            let id = 0x400 + current;
-            mbh = GetBlockHeader::some(mbh.previous_header)
-               .execute(&mut connection, LightId::new(id)).expect("to get one header at least");
+            mbh = command::GetBlockHeader::some(mbh.previous_header)
+               .execute(&mut connection).expect("to get one header at least");
             println!("prv block header: {}", mbh.previous_header);
         };
 
@@ -165,9 +52,8 @@ fn main() {
     // example below works on mainnet only:
     // let prev_block_id = packet::HeaderHash::from_bytes([0x42, 0x88, 0xff, 0xec, 0x11, 0x22, 0x10, 0x6d, 0xf4, 0x4c, 0xcf, 0x12, 0xfc, 0xfb, 0xde, 0x44, 0xdb, 0xe0, 0x7d, 0x24, 0x5d, 0xba, 0x06, 0x23, 0xba, 0xb8, 0xb8, 0x63, 0xa7, 0x04, 0x85, 0x64]);
     {
-        let id = 0x400 + current;
-        let blk = GetBlock::only(prev_blk_id)
-            .execute(&mut connection, LightId::new(id)).expect("to get a block");
+        let blk = command::GetBlock::only(prev_blk_id)
+            .execute(&mut connection).expect("to get a block");
         println!("Block: {:?}", blk);
     };
 }
