@@ -25,7 +25,7 @@ pub struct Storage {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum StorageFileType {
-    Pack, Index, Blob
+    Pack, Index, Blob, Tag
 }
 
 impl Storage {
@@ -50,6 +50,7 @@ impl Storage {
             StorageFileType::Pack => p.push("pack/"),
             StorageFileType::Index => p.push("index/"),
             StorageFileType::Blob => p.push("blob/"),
+            StorageFileType::Tag => p.push("tag/"),
         }
         p
     }
@@ -66,6 +67,11 @@ impl Storage {
     pub fn get_blob_filepath(&self, blockhash: &BlockHash) -> PathBuf {
         let mut p = self.get_filetype_dir(StorageFileType::Blob);
         p.push(encode(blockhash));
+        p
+    }
+    pub fn get_tag_filepath(&self, s: &String) -> PathBuf {
+        let mut p = self.get_filetype_dir(StorageFileType::Tag);
+        p.push(s);
         p
     }
 
@@ -107,6 +113,25 @@ impl io::Write for TmpFile {
 
 fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile {
     TmpFile::create(storage.get_filetype_dir(filetype)).unwrap()
+}
+
+pub mod tag {
+    use std::fs;
+    use std::io::{Write,Read};
+
+    pub fn write(storage: &super::Storage, name: &String, content: &[u8]) {
+        let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
+        tmp_file.file.write_all(content).unwrap();
+        tmp_file.render_permanent(&storage.get_tag_filepath(name));
+    }
+
+    pub fn read(storage: &super::Storage, name: &String) -> Option<Vec<u8>> {
+        let mut content = Vec::new();
+        let path = storage.get_tag_filepath(name);
+        let mut file = fs::File::open(path).unwrap();
+        file.read_to_end(&mut content).unwrap();
+        Some(content)
+    }
 }
 
 pub mod blob {
