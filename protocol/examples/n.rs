@@ -165,7 +165,7 @@ fn main() {
         {
             let id = 0x400 + current;
             let blk = GetBlock::only(mbh.previous_header.clone())
-                .execute(&mut connection, LightId::new(id)).expect("to get one header at least");
+                .execute(&mut connection, LightId::new(id)).expect("to get a block");
             println!("Block: {:?}", blk);
         };
     }
