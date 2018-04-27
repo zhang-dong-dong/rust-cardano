@@ -113,6 +113,11 @@ pub mod blob {
         file.read_to_end(&mut content).unwrap();
         content
     }
+
+    pub fn exist(storage: &super::Storage, hash: &super::BlockHash) -> bool {
+        let p = storage.get_blob_filepath(hash);
+        p.as_path().exists()
+    }
 }
 
 pub mod pack {
