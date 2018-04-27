@@ -226,13 +226,13 @@ pub mod pack {
         }
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
-        for (hash,_) in sorted.iter() {
+        for &(hash,_) in sorted.iter() {
             tmpfile.file.write_all(&hash[..]).unwrap();
         }
 
         let offsets : &[Offset] = &[];
         
-        for (_, ofs) in sorted.iter() {
+        for &(_, ofs) in sorted.iter() {
             let mut buf = [0u8;8];
             write_size(&mut buf, *ofs);
             tmpfile.file.write_all(&buf[..]).unwrap();
