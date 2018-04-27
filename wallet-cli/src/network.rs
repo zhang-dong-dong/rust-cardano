@@ -1,4 +1,4 @@
-use wallet_crypto::util::{hex, base58};
+use wallet_crypto::util::{hex};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
@@ -6,13 +6,12 @@ use storage::{Storage, blob};
 use rand;
 use std::net::TcpStream;
 
-use wallet_crypto::config::ProtocolMagic;
 use protocol;
 use protocol::command::*;
 
 pub struct Network(protocol::Connection<TcpStream>);
 impl Network {
-    fn new(cfg: &Config) -> Self {
+    pub fn new(cfg: &Config) -> Self {
         let drg_seed = rand::random();
         let mut hs = protocol::packet::Handshake::default();
         hs.protocol_magic = cfg.protocol_magic;

@@ -14,11 +14,13 @@ mod command;
 mod wallet;
 mod storage;
 mod network;
+mod block;
 
 use config::{Config};
 use command::{HasCommand};
 use wallet::{Wallet};
 use network::{Network};
+use block::{Block};
 
 use std::env::{home_dir};
 use std::path::{PathBuf};
@@ -34,6 +36,7 @@ fn main() {
         .subcommand(Config::clap_options())
         .subcommand(Wallet::clap_options())
         .subcommand(Network::clap_options())
+        .subcommand(Block::clap_options())
         .get_matches();
 
     let cfg_path = matches.value_of("config")
@@ -52,6 +55,7 @@ fn main() {
             };
         },
         ("network", Some(sub_matches)) => { Network::run(cfg, sub_matches); },
+        ("block",   Some(sub_matches)) => { Block::run(cfg, sub_matches); },
         _ => {
             println!("{}", matches.usage());
             ::std::process::exit(1);
