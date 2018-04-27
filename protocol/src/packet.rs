@@ -591,7 +591,7 @@ impl cbor::CborValue for BlockResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use self::wallet_crypto::cbor;
+    use wallet_crypto::cbor;
 
     const GET_BLOCK_HEADER_BYTES : &'static [u8] = &[
           0x82, 0x00, 0x9f, 0x82, 0x01, 0x85, 0x1a, 0x2d
