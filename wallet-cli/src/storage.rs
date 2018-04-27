@@ -23,6 +23,7 @@ pub struct Storage {
     pub blk_type: String, // example "mainnet" or "testnet"
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum StorageFileType {
     Pack, Index, Blob
 }
