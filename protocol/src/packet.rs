@@ -444,15 +444,20 @@ pub mod block {
 
         #[derive(Debug)]
         pub struct TxPayload {
-            txs: LinkedList<tx::Tx>,
-            witnesses: LinkedList<Vec<tx::TxInWitness>>
+            txaux: LinkedList<tx::TxAux>
+            // txs: LinkedList<tx::Tx>,
+            // witnesses: LinkedList<Vec<tx::TxInWitness>>
         }
         impl TxPayload {
-            pub fn new(txs: LinkedList<tx::Tx>, wts: LinkedList<Vec<tx::TxInWitness>>) -> Self {
-                TxPayload { txs: txs, witnesses: wts }
+            // pub fn new(txs: LinkedList<tx::Tx>, wts: LinkedList<Vec<tx::TxInWitness>>) -> Self {
+                // TxPayload { txs: txs, witnesses: wts }
+            pub fn new(txaux: LinkedList<tx::TxAux>) -> Self {
+                TxPayload { txaux: txaux }
+                // TxPayload { txs: txs, witnesses: wts }
             }
             pub fn empty() -> Self {
-                TxPayload::new(LinkedList::new(), LinkedList::new())
+                TxPayload::new(LinkedList::new())
+                // TxPayload::new(LinkedList::new(), LinkedList::new())
             }
         }
         impl cbor::CborValue for TxPayload {
@@ -461,15 +466,18 @@ pub mod block {
             }
             fn decode(value: cbor::Value) -> cbor::Result<Self> {
                 value.iarray().and_then(|array| {
-                    if ! array.is_empty() { return cbor::Result::iarray(array, cbor::Error::UnparsedValues); }
-                    Ok(TxPayload::empty())
+                    let mut l = LinkedList::new();
+                    for i in array {
+                        l.push_back(cbor::CborValue::decode(i)?);
+                    }
+                    Ok(TxPayload::new(l))
                 }).embed("While decoding TxPayload")
             }
         }
 
         #[derive(Debug)]
         pub struct Body {
-            tx: TxPayload, // { [tx::Tx], [tx::TxWitnesses] }
+            tx: TxPayload,
             scc: cbor::Value,
             delegation: cbor::Value,
             update: cbor::Value
