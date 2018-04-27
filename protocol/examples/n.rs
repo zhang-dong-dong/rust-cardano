@@ -149,10 +149,10 @@ fn main() {
         .expect("to get one header at least");
     println!("prv block header: {}", mbh.previous_header);
 
-    let mut current = 10;
+    let mut current = 1;
     loop {
         current += 1;
-        if current > (10 + MAX_ALLOWED_ITERATIONS) { break; }
+        if current > (2 + MAX_ALLOWED_ITERATIONS) { break; }
 
         {
             let id = 0x400 + current;
