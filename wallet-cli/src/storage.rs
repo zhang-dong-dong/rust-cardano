@@ -29,6 +29,16 @@ pub enum StorageFileType {
 }
 
 impl Storage {
+    pub fn init(root: PathBuf, blk_type: String) -> io::Result<Self> {
+        let storage = Storage { root_path: root, blk_type: blk_type };
+
+        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Blob))?;
+        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Index))?;
+        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Pack))?;
+
+        Ok(storage)
+    }
+
     pub fn get_path(&self) -> PathBuf {
         let mut p = self.root_path.clone();
         p.push(&self.blk_type);
@@ -58,10 +68,7 @@ impl Storage {
         p.push(encode(blockhash));
         p
     }
-}
 
-pub fn init() -> () {
-    //fs::create_dir_all("blocks/mainnet")
 }
 
 pub struct TmpFile {
