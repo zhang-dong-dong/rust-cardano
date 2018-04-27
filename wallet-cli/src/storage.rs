@@ -220,6 +220,12 @@ pub mod pack {
           | ((buf[7] as u64))
     }
 
+    fn file_read_size(mut file: &fs::File) -> u64 {
+        let mut buf = [0u8;8];
+        file.read_exact(&mut buf).unwrap();
+        read_size(&buf)
+    }
+
     pub fn create_index(storage: &super::Storage, index: &Index) -> super::TmpFile {
         let mut tmpfile = super::tmpfile_create_type(storage, super::StorageFileType::Index);
         let mut hdr_buf = [0u8;32];
