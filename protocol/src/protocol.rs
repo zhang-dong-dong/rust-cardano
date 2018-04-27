@@ -321,7 +321,7 @@ pub mod command {
     }
 
     impl<W> Command<W> for GetBlock where W: Read+Write {
-        type Output = packet::block::Block;
+        type Output = Vec<u8>; // packet::block::Block;
         fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
             // require the initial header
             let (get_header_id, get_header_dat) = packet::send_msg_getblocks(&self.from, &self.to);
@@ -343,10 +343,7 @@ pub mod command {
                 Some(lc) => {
                     assert!(lc.get_id() == id);
                     if let Some(dat) = lc.get_received() {
-                        let mut l : packet::BlockResponse = cbor::decode_from_cbor(&dat).unwrap();
-                        match l {
-                            packet::BlockResponse::Ok(resp) => Ok(resp),
-                        }
+                        Ok(dat)
                     } else { Err("No received data...") }
                 },
                 None => {
