@@ -182,14 +182,15 @@ pub mod pack {
           | ((buf[7] as u64))
     }
 
-    pub fn create_index(storage: &super::Storage, hashes: &[super::BlockHash], sizes: &[Size]) -> TmpFile {
+    pub fn create_index(storage: &super::Storage, index: &Index) -> super::TmpFile {
         let mut tmpfile = super::tmpfile_create_type(storage, super::StorageFileType::Index);
         let mut hdr_buf = [0u8;32];
+        let entries = index.hashes.len();
 
-        assert!(hashes.len() == sizes.len());
+        assert!(entries == index.offsets.len());
 
         hdr_buf[0..8].clone_from_slice(&MAGIC[..]);
-        write_size(&mut hdr_buf[8..16], hashes.len() as u64);
+        write_size(&mut hdr_buf[8..16], entries as u64);
 
         // write 32 bytes:
         // * magic (8 bytes)
@@ -199,7 +200,7 @@ pub mod pack {
 
         // write fanout
         let mut fanout = [0u64;256];
-        for &hash in hashes.iter() {
+        for &hash in index.hashes.iter() {
             let ofs = hash[0] as usize;
             fanout[ofs] = fanout[ofs]+1;
         }
@@ -211,13 +212,19 @@ pub mod pack {
         }
         tmpfile.file.write_all(&fanout_buf).unwrap();
 
-        for &hash in hashes.iter() {
+        let mut sorted = Vec::with_capacity(entries);
+        for i in 0..entries {
+            sorted[i] = (index.hashes[i], index.offsets[i]);
+        }
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+
+        for (hash,_) in sorted.iter() {
             tmpfile.file.write_all(&hash[..]).unwrap();
         }
 
         let offsets : &[Offset] = &[];
         
-        for ofs in offsets.iter() {
+        for (_, ofs) in sorted.iter() {
             let mut buf = [0u8;8];
             write_size(&mut buf, *ofs);
             tmpfile.file.write_all(&buf[..]).unwrap();
@@ -248,9 +255,9 @@ pub mod pack {
     */
 
     #[derive(Clone)]
-    struct Index {
-        hashes: Vec<super::BlockHash>,
-        offsets: Vec<Offset>,
+    pub struct Index {
+        pub hashes: Vec<super::BlockHash>,
+        pub offsets: Vec<Offset>,
     }
 
     impl Index {
