@@ -43,10 +43,8 @@ impl<W> Command<W> for GetBlockHeader where W: Read+Write {
         connection.send_bytes(id, &[get_header_id]);
         connection.send_bytes(id, &get_header_dat[..]);
         connection.broadcast();
-        match connection.poll() {
+        match connection.poll_id(id) {
             Some(lc) => {
-                assert_eq!(lc.get_id(), id);
-                // drop the received data.
                 let _ = lc.get_received();
             },
             None => {
@@ -54,7 +52,7 @@ impl<W> Command<W> for GetBlockHeader where W: Read+Write {
             }
         };
         connection.broadcast();
-        let rep = match connection.poll() {
+        let rep = match connection.poll_id(id) {
             Some(lc) => {
                 assert!(lc.get_id() == id);
                 if let Some(dat) = lc.get_received() {
@@ -101,7 +99,7 @@ impl<W> Command<W> for GetBlock where W: Read+Write {
         connection.send_bytes(id, &[get_header_id]);
         connection.send_bytes(id, &get_header_dat[..]);
         connection.broadcast();
-        match connection.poll() {
+        match connection.poll_id(id) {
             Some(lc) => {
                 assert_eq!(lc.get_id(), id);
                 // drop the received data.
@@ -112,7 +110,7 @@ impl<W> Command<W> for GetBlock where W: Read+Write {
             }
         };
         connection.broadcast();
-        let rep = match connection.poll() {
+        let rep = match connection.poll_id(id) {
             Some(lc) => {
                 assert!(lc.get_id() == id);
                 if let Some(dat) = lc.get_received() {
