@@ -531,7 +531,7 @@ pub mod block {
         }
         impl fmt::Display for Block {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                writeln!(f, "{:?}", self.header)?;
+                writeln!(f, "{}", self.header)?;
                 write!(f, "{}", self.body)
             }
         }
