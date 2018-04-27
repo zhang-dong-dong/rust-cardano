@@ -234,7 +234,7 @@ pub mod pack {
         
         for &(_, ofs) in sorted.iter() {
             let mut buf = [0u8;8];
-            write_size(&mut buf, *ofs);
+            write_size(&mut buf, ofs);
             tmpfile.file.write_all(&buf[..]).unwrap();
         }
         tmpfile
