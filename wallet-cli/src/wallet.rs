@@ -29,9 +29,6 @@ impl HasCommand for Wallet {
             .subcommand(SubCommand::with_name("generate")
                 .about("generate a new wallet")
             )
-            .subcommand(SubCommand::with_name("init")
-                .about("initialise the storage associated to the given wallet")
-            )
             .subcommand(SubCommand::with_name("address")
                 .about("create an address with the given options")
                 .arg(Arg::with_name("is_internal").long("internal").help("to generate an internal address (see BIP44)"))
@@ -49,12 +46,8 @@ impl HasCommand for Wallet {
                 // expect no existing wallet
                 assert!(cfg.wallet.is_none());
                 cfg.wallet = Some(Wallet::generate());
+                Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
                 Some(cfg) // we need to update the config's wallet
-            },
-            ("init", _) => {
-                assert!(cfg.wallet.is_some());
-                Storage::init(cfg.storage, cfg.network_type).unwrap();
-                None
             },
             ("address", Some(opts)) => {
                 // expect existing wallet

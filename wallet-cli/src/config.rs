@@ -23,7 +23,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         let mut storage_dir = home_dir().unwrap();
-        storage_dir.push(".ariadne");
+        storage_dir.push(".ariadne/blocks");
         Config {
             accounts: vec![Account::default()],
             wallet: None,

@@ -57,6 +57,6 @@ fn main() {
 fn get_default_config() -> PathBuf {
     match home_dir() {
         None => panic!("Unable to retrieve your home directory, set the --config option"),
-        Some(mut d) => {d.push(".ariadne-wallet.yml"); d }
+        Some(mut d) => {d.push(".ariadne/wallet.yml"); d }
     }
 }
