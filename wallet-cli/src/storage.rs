@@ -104,7 +104,7 @@ impl TmpFile {
     pub fn create(mut path: PathBuf) -> io::Result<Self> {
         let v1 : u64 = rand::random();
         let v2 : u64 = rand::random();
-        path.join(format!(".tmp.{}{}", v1, v2));
+        path.push(format!(".tmp.{}{}", v1, v2));
 
         OpenOptions::new()
             .write(true)
