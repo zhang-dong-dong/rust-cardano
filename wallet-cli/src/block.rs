@@ -34,12 +34,8 @@ impl HasCommand for Block {
                 }
                 let bytes = blob::read(&storage, hh.bytes());
 
-                let br : packet::BlockResponse = cbor::decode_from_cbor(&bytes).unwrap();
-                match br {
-                    packet::BlockResponse::Ok(blk) => {
-                        println!("Block: {:?}", blk);
-                    }
-                }
+                let blk : packet::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
+                println!("Block: {:?}", blk);
             },
             _ => {
                 println!("{}", args.usage());

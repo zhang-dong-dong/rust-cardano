@@ -11,7 +11,7 @@ use protocol::command::*;
 
 pub struct Network(protocol::Connection<TcpStream>);
 impl Network {
-    pub fn new(cfg: &Config) -> Self {
+    fn new(cfg: &Config) -> Self {
         let drg_seed = rand::random();
         let mut hs = protocol::packet::Handshake::default();
         hs.protocol_magic = cfg.protocol_magic;
@@ -54,7 +54,7 @@ impl HasCommand for Network {
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");
                 let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
-                blob::write(&storage, hh.bytes(), &b);
+                blob::write(&storage, hh.bytes(), &b[2..]);
             },
             _ => {
                 println!("{}", args.usage());
