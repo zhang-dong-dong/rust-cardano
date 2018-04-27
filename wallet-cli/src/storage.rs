@@ -15,9 +15,14 @@ pub type BlockHash = [u8;HASH_SIZE];
 pub type PackHash = [u8;HASH_SIZE];
 
 #[derive(Clone)]
-pub struct Storage {
+pub struct StorageConfig {
     pub root_path: PathBuf,
     pub blk_type: String, // example "mainnet" or "testnet"
+}
+
+pub struct Storage {
+    config: StorageConfig,
+    fanouts: Vec<(PackHash, pack::Fanout)>,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -26,17 +31,22 @@ pub enum StorageFileType {
 }
 
 impl Storage {
-    pub fn init(root: PathBuf, blk_type: String) -> io::Result<Self> {
-        let storage = Storage { root_path: root, blk_type: blk_type };
+    pub fn init(cfg: &StorageConfig) -> io::Result<Self> {
+        let storage = Storage { config: cfg.clone(), fanouts: Vec::new() };
 
-        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Blob))?;
-        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Index))?;
-        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Pack))?;
-        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Tag))?;
+        fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Blob))?;
+        fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Index))?;
+        fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Pack))?;
+        fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Tag))?;
 
         Ok(storage)
     }
+}
 
+impl StorageConfig {
+    pub fn new(path_buf: &PathBuf, blk_type: &String) -> Self {
+        StorageConfig { root_path: path_buf.clone(), blk_type: blk_type.clone() }
+    }
     pub fn get_path(&self) -> PathBuf {
         let mut p = self.root_path.clone();
         p.push(&self.blk_type);
@@ -79,12 +89,13 @@ impl Storage {
         for entry in fs::read_dir(p).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_file() {
-                let path = entry.file_name().into_string().unwrap();
-                let mut packref = [0;HASH_SIZE];
-                let v = decode(path.as_ref());
-                if v.len() == 32 {
-                    packref.clone_from_slice(&v[..]);
-                    packs.push(packref);
+                if let Ok(s) = entry.file_name().into_string() {
+                    if s.len() == 64 {
+                        let v = decode(s.as_ref());
+                        let mut packref = [0;HASH_SIZE];
+                        packref.clone_from_slice(&v[..]);
+                        packs.push(packref);
+                    }
                 }
 
             }
@@ -92,6 +103,29 @@ impl Storage {
         packs
     }
 
+    pub fn list_blob(&self, limits: Option<usize>) -> Vec<BlockHash> {
+        let mut blobs = Vec::new();
+        let p = self.get_filetype_dir(StorageFileType::Blob);
+        for entry in fs::read_dir(p).unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_file() {
+                if let Ok(s) = entry.file_name().into_string() {
+                    if s.len() == 64 {
+                        let v = decode(s.as_ref());
+                        let mut blobref = [0;HASH_SIZE];
+                        blobref.clone_from_slice(&v[..]);
+                        blobs.push(blobref);
+                        match limits {
+                            None => {},
+                            Some(l) => if blobs.len() >= l { break }
+                        }
+                    }
+                }
+
+            }
+        }
+        blobs
+    }
 }
 
 pub struct TmpFile {
@@ -129,7 +163,7 @@ impl io::Write for TmpFile {
 }
 
 fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile {
-    TmpFile::create(storage.get_filetype_dir(filetype)).unwrap()
+    TmpFile::create(storage.config.get_filetype_dir(filetype)).unwrap()
 }
 
 pub mod tag {
@@ -139,20 +173,20 @@ pub mod tag {
     pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
         let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
         tmp_file.file.write_all(content).unwrap();
-        tmp_file.render_permanent(&storage.get_tag_filepath(name));
+        tmp_file.render_permanent(&storage.config.get_tag_filepath(name));
     }
 
     pub fn read(storage: &super::Storage, name: &str) -> Option<Vec<u8>> {
         if ! exist(storage, name) { return None; }
         let mut content = Vec::new();
-        let path = storage.get_tag_filepath(name);
+        let path = storage.config.get_tag_filepath(name);
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
         Some(content)
     }
 
     pub fn exist(storage: &super::Storage, name: &str) -> bool {
-        let p = storage.get_tag_filepath(name);
+        let p = storage.config.get_tag_filepath(name);
         p.as_path().exists()
     }
 }
@@ -166,13 +200,13 @@ pub mod blob {
         tmp_file.file.write_all(block).unwrap();
 
         // finalize
-        let path = storage.get_blob_filepath(&hash);
+        let path = storage.config.get_blob_filepath(&hash);
         tmp_file.render_permanent(&path);
     }
 
     pub fn read(storage: &super::Storage, hash: &super::BlockHash) -> Vec<u8> {
         let mut content = Vec::new();
-        let path = storage.get_blob_filepath(&hash);
+        let path = storage.config.get_blob_filepath(&hash);
         
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
@@ -180,9 +214,13 @@ pub mod blob {
     }
 
     pub fn exist(storage: &super::Storage, hash: &super::BlockHash) -> bool {
-        let p = storage.get_blob_filepath(hash);
+        let p = storage.config.get_blob_filepath(hash);
         p.as_path().exists()
     }
+}
+
+pub fn read_block(storage: &Storage, hash: &BlockHash) -> Vec<u8> {
+    blob::read(storage, hash)
 }
 
 pub mod pack {
@@ -333,7 +371,7 @@ pub mod pack {
     }
 
     pub fn read_index_fanout(storage: &super::Storage, pack: &super::PackHash) -> Fanout {
-        let mut file = fs::File::open(storage.get_index_filepath(pack)).unwrap();
+        let mut file = fs::File::open(storage.config.get_index_filepath(pack)).unwrap();
         file.seek(SeekFrom::Start(IDX_OFS_FANOUT)).unwrap();
         let mut buf = [0u8;256*8];
         file.read_exact(&mut buf).unwrap();
@@ -426,16 +464,16 @@ pub mod pack {
         index: Index,
         pos: u64,
         hash_context: blake2b::Blake2b, // hash of all the content of blocks without length or padding
-        storage: super::Storage,
+        storage_config: super::StorageConfig,
     }
 
     impl PackWriter {
-        pub fn init(storage: &super::Storage) -> Self {
-            let tmpfile = TmpFile::create(storage.get_filetype_dir(super::StorageFileType::Pack)).unwrap();
+        pub fn init(cfg: &super::StorageConfig) -> Self {
+            let tmpfile = TmpFile::create(cfg.get_filetype_dir(super::StorageFileType::Pack)).unwrap();
             let idx = Index::new();
             let ctxt = blake2b::Blake2b::new(32);
             PackWriter
-                { tmpfile: tmpfile, index: idx, pos: 0, storage: storage.clone(), hash_context: ctxt }
+                { tmpfile: tmpfile, index: idx, pos: 0, storage_config: cfg.clone(), hash_context: ctxt }
         }
 
         pub fn append(&mut self, blockhash: &super::BlockHash, block: &[u8]) {
@@ -459,7 +497,7 @@ pub mod pack {
         pub fn finalize(&mut self) -> (super::PackHash, Index) {
             let mut packhash : super::PackHash = [0u8;super::HASH_SIZE];
             self.hash_context.result(&mut packhash);
-            let path = self.storage.get_pack_filepath(&packhash);
+            let path = self.storage_config.get_pack_filepath(&packhash);
             self.tmpfile.render_permanent(&path);
             (packhash, self.index.clone())
         }

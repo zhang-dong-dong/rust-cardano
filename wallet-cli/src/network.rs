@@ -3,7 +3,7 @@ use wallet_crypto::{cbor};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, blob, tag};
+use storage::{Storage, StorageConfig, blob, tag};
 use rand;
 use std::net::TcpStream;
 
@@ -50,7 +50,8 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
                 let mut mbh = GetBlockHeader::first().execute(&mut net.0)
                     .expect("to get one header at least");
-                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let storage = Storage::init(&store_config).unwrap();
                 tag::write(&storage, "HEAD", mbh.previous_header.as_ref());
                 println!("prv block header: {}", mbh.previous_header);
             },
@@ -61,11 +62,13 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");
-                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let storage = Storage::init(&store_config).unwrap();
                 blob::write(&storage, hh.bytes(), &b[2..]);
             },
             ("sync", _) => {
-                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let storage = Storage::init(&store_config).unwrap();
 
                 let genesis_tag = tag::read(&storage, "GENESIS").or_else(|| {
                     tag::read(&storage, "HEAD")

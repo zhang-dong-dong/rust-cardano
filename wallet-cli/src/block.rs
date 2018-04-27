@@ -2,7 +2,7 @@ use wallet_crypto::util::{hex};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, blob};
+use storage::{Storage, StorageConfig, blob};
 use wallet_crypto::cbor;
 
 use protocol;
@@ -27,7 +27,8 @@ impl HasCommand for Block {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
                 let hh_bytes = hex::decode(&hh_hex);
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
-                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let storage = Storage::init(&store_config).unwrap();
                 if ! blob::exist(&storage, hh.bytes()) {
                     println!("Error: block `{}' does not exit", hh);
                     ::std::process::exit(1);

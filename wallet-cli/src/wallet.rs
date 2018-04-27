@@ -5,7 +5,7 @@ use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use account::{Account};
-use storage::{Storage};
+use storage::{Storage, StorageConfig};
 use rand;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,14 +51,16 @@ impl HasCommand for Wallet {
                 // expect no existing wallet
                 assert!(cfg.wallet.is_none());
                 cfg.wallet = Some(Wallet::generate());
-                Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
+                let storage = Storage::init(&store_config).unwrap();
                 Some(cfg) // we need to update the config's wallet
             },
             ("debug-index", opts) => {
-                let storage = Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
+                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
+                let storage = Storage::init(&store_config).unwrap();
                 match opts {
                     None    => {
-                        let vs = storage.list_indexes();
+                        let vs = store_config.list_indexes();
                         for &v in vs.iter() {
                             println!("{}", encode(&v));
                         }
