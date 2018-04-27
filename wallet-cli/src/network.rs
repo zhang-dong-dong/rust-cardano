@@ -54,7 +54,7 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh).execute(&mut net.0)
                     .expect("to get one header at least");
-                println!("block header: {:?}", b);
+                println!("block: {:?}", b);
             },
             _ => {
                 println!("{}", args.usage());
