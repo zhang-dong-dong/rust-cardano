@@ -523,9 +523,9 @@ pub mod block {
 
         #[derive(Debug)]
         pub struct Block {
-            header: MainBlockHeader,
-            body: Body,
-            extra: cbor::Value
+            pub header: MainBlockHeader,
+            pub body: Body,
+            pub extra: cbor::Value
         }
         impl Block {
             pub fn new(h: MainBlockHeader, b: Body, e: cbor::Value) -> Self {

@@ -1,12 +1,15 @@
 use wallet_crypto::util::{hex};
+use wallet_crypto::{cbor};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, blob};
+use storage::{Storage, blob, tag};
 use rand;
 use std::net::TcpStream;
 
 use protocol;
+use protocol::packet;
+use protocol::packet::block;
 use protocol::command::*;
 
 pub struct Network(protocol::Connection<TcpStream>);
@@ -37,6 +40,9 @@ impl HasCommand for Network {
                 .about("get a given block")
                 .arg(Arg::with_name("blockid").help("hexadecimal encoded block id").index(1).required(true))
             )
+            .subcommand(SubCommand::with_name("sync")
+                .about("get the next block repeatedly")
+            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         match args.subcommand() {
@@ -44,6 +50,8 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
                 let mut mbh = GetBlockHeader::first().execute(&mut net.0)
                     .expect("to get one header at least");
+                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+                tag::write(&storage, "HEAD", mbh.previous_header.as_ref());
                 println!("prv block header: {}", mbh.previous_header);
             },
             ("get-block", Some(opt)) => {
@@ -55,6 +63,25 @@ impl HasCommand for Network {
                     .expect("to get one block at least");
                 let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
                 blob::write(&storage, hh.bytes(), &b[2..]);
+            },
+            ("sync", _) => {
+                let storage = Storage::init(config.storage.clone(), config.network_type.clone()).unwrap();
+
+                let genesis_tag = tag::read(&storage, "GENESIS").or_else(|| {
+                    tag::read(&storage, "HEAD")
+                }).unwrap();
+
+                let hh = protocol::packet::HeaderHash::from_slice(&genesis_tag).expect("blockid invalid");
+                let mut net = Network::new(&config);
+                let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
+                    .expect("to get one block at least");
+                blob::write(&storage, hh.bytes(), &b[2..]);
+                let blk : packet::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
+                match blk {
+                    block::Block::MainBlock(blk) => {
+                        tag::write(&storage, "GENESIS", blk.header.previous_header.as_ref());
+                    }
+                }
             },
             _ => {
                 println!("{}", args.usage());

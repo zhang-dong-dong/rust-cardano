@@ -1,7 +1,4 @@
-//use std::rt::io::{file, Open};
-//use std::path::Path;
-use std::path::PathBuf;
-//use std::rt::io::file::FileInfo;
+use std::path::{PathBuf, Path};
 use std::{fs, io};
 use std::fs::OpenOptions;
 
@@ -35,6 +32,7 @@ impl Storage {
         fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Blob))?;
         fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Index))?;
         fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Pack))?;
+        fs::create_dir_all(storage.get_filetype_dir(StorageFileType::Tag))?;
 
         Ok(storage)
     }
@@ -69,7 +67,7 @@ impl Storage {
         p.push(encode(blockhash));
         p
     }
-    pub fn get_tag_filepath(&self, s: &String) -> PathBuf {
+    pub fn get_tag_filepath<P: AsRef<Path>>(&self, s: P) -> PathBuf {
         let mut p = self.get_filetype_dir(StorageFileType::Tag);
         p.push(s);
         p
@@ -138,18 +136,24 @@ pub mod tag {
     use std::fs;
     use std::io::{Write,Read};
 
-    pub fn write(storage: &super::Storage, name: &String, content: &[u8]) {
+    pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
         let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
         tmp_file.file.write_all(content).unwrap();
         tmp_file.render_permanent(&storage.get_tag_filepath(name));
     }
 
-    pub fn read(storage: &super::Storage, name: &String) -> Option<Vec<u8>> {
+    pub fn read(storage: &super::Storage, name: &str) -> Option<Vec<u8>> {
+        if ! exist(storage, name) { return None; }
         let mut content = Vec::new();
         let path = storage.get_tag_filepath(name);
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
         Some(content)
+    }
+
+    pub fn exist(storage: &super::Storage, name: &str) -> bool {
+        let p = storage.get_tag_filepath(name);
+        p.as_path().exists()
     }
 }
 
