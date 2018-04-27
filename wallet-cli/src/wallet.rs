@@ -39,10 +39,6 @@ impl HasCommand for Wallet {
                     .multiple(true)
                 )
             )
-            .subcommand(SubCommand::with_name("sync")
-                .about("download blocks associated with a wallet")
-                .arg(Arg::with_name("account").help("account to sync").index(1).required(true))
-            )
             .subcommand(SubCommand::with_name("debug-index")
                 .about("internal debug command")
                 .arg(Arg::with_name("packhash").help("pack to query").index(1))
@@ -57,9 +53,6 @@ impl HasCommand for Wallet {
                 cfg.wallet = Some(Wallet::generate());
                 Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
                 Some(cfg) // we need to update the config's wallet
-            },
-            ("sync", Some(opts)) => {
-                Some(cfg)
             },
             ("debug-index", opts) => {
                 let storage = Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
