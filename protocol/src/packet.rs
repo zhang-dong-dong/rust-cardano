@@ -452,6 +452,9 @@ pub mod block {
         }
         impl fmt::Display for TxPayload {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                if self.txaux.is_empty() {
+                    return write!(f, "<no transactions>");
+                }
                 for txaux in self.txaux.iter() {
                     writeln!(f, "{}", txaux)?;
                 }
