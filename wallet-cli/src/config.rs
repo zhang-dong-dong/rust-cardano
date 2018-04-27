@@ -15,7 +15,7 @@ pub struct Config {
     pub accounts: Vec<Account>,
     pub wallet: Option<Wallet>,
     pub network_type: String,
-    pub newtork_domain: String,
+    pub network_domain: String,
     pub protocol_magic: ProtocolMagic,
     pub storage: PathBuf
 }
@@ -28,7 +28,7 @@ impl Default for Config {
             accounts: vec![Account::default()],
             wallet: None,
             network_type: "mainnet".to_string(),
-            newtork_domain: "relays.cardano-mainnet.iohk.io:3000".to_string(),
+            network_domain: "relays.cardano-mainnet.iohk.io:3000".to_string(),
             protocol_magic: ProtocolMagic::default(),
             storage: storage_dir,
         }

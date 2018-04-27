@@ -38,6 +38,10 @@ impl HasCommand for Wallet {
                     .multiple(true)
                 )
             )
+            .subcommand(SubCommand::with_name("sync")
+                .about("download blocks associated with a wallet")
+                .arg(Arg::with_name("account").help("account to sync").index(1).required(true))
+            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         let mut cfg = config;
@@ -48,6 +52,9 @@ impl HasCommand for Wallet {
                 cfg.wallet = Some(Wallet::generate());
                 Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
                 Some(cfg) // we need to update the config's wallet
+            },
+            ("sync", Some(opts)) => {
+                Some(cfg)
             },
             ("address", Some(opts)) => {
                 // expect existing wallet
