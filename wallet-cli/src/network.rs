@@ -53,7 +53,7 @@ impl HasCommand for Network {
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh).execute(&mut net.0)
-                    .expect("to get one header at least");
+                    .expect("to get one block at least");
                 println!("block: {:?}", b);
             },
             _ => {
