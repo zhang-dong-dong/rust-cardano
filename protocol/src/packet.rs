@@ -497,12 +497,12 @@ pub mod block {
 
         #[derive(Debug)]
         pub struct Block {
-            header: BlockHeader,
+            header: MainBlockHeader,
             body: Body,
             extra: Todo
         }
         impl Block {
-            pub fn new(h: BlockHeader, b: Body, e: Todo) -> Self {
+            pub fn new(h: MainBlockHeader, b: Body, e: Todo) -> Self {
                 Block { header: h, body: b, extra: e }
             }
         }
@@ -576,7 +576,7 @@ impl cbor::CborValue for BlockResponse {
             } else {
                 cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
             }
-        })
+        }).embed("While decoding block's response")
     }
 }
 
