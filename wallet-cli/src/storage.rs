@@ -6,7 +6,7 @@ use std::{fs, io};
 use std::fs::OpenOptions;
 
 use wallet_crypto::util::hex::{encode};
-//use wallet_crypto::util::hex::{decode};
+use wallet_crypto::util::hex::{decode};
 
 use rcw;
 
@@ -73,6 +73,25 @@ impl Storage {
         let mut p = self.get_filetype_dir(StorageFileType::Tag);
         p.push(s);
         p
+    }
+
+    pub fn list_indexes(&self) -> Vec<PackHash> {
+        let mut packs = Vec::new();
+        let p = self.get_filetype_dir(StorageFileType::Index);
+        for entry in fs::read_dir(p).unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_file() {
+                let path = entry.file_name().into_string().unwrap();
+                let mut packref = [0;HASH_SIZE];
+                let v = decode(path.as_ref());
+                if v.len() == 32 {
+                    packref.clone_from_slice(&v[..]);
+                    packs.push(packref);
+                }
+
+            }
+        }
+        packs
     }
 
 }

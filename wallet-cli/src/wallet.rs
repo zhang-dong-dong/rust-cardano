@@ -1,4 +1,5 @@
 use wallet_crypto::{wallet, hdwallet, bip44};
+use wallet_crypto::util::hex::{encode};
 use wallet_crypto::util::base58;
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
@@ -42,6 +43,10 @@ impl HasCommand for Wallet {
                 .about("download blocks associated with a wallet")
                 .arg(Arg::with_name("account").help("account to sync").index(1).required(true))
             )
+            .subcommand(SubCommand::with_name("debug-index")
+                .about("internal debug command")
+                .arg(Arg::with_name("packhash").help("pack to query").index(1))
+            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         let mut cfg = config;
@@ -54,6 +59,20 @@ impl HasCommand for Wallet {
                 Some(cfg) // we need to update the config's wallet
             },
             ("sync", Some(opts)) => {
+                Some(cfg)
+            },
+            ("debug-index", opts) => {
+                let storage = Storage::init(cfg.storage.clone(), cfg.network_type.clone()).unwrap();
+                match opts {
+                    None    => {
+                        let vs = storage.list_indexes();
+                        for &v in vs.iter() {
+                            println!("{}", encode(&v));
+                        }
+                    },
+                    Some(_) => {
+                    }
+                }
                 Some(cfg)
             },
             ("address", Some(opts)) => {
