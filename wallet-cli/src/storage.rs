@@ -2,7 +2,7 @@
 //use std::path::Path;
 use std::path::PathBuf;
 //use std::rt::io::file::FileInfo;
-use std::fs;
+use std::{fs, io};
 use std::fs::OpenOptions;
 
 use wallet_crypto::util::hex::{encode};
@@ -64,32 +64,41 @@ pub fn init() -> () {
 }
 
 pub struct TmpFile {
-    pub file: fs::File,
-    tmp_path: PathBuf,
+    file: fs::File,
+    path: PathBuf,
 }
-
 impl TmpFile {
-    pub fn create(dir: &PathBuf) -> Self {
+    pub fn create(mut path: PathBuf) -> io::Result<Self> {
         let v1 : u64 = rand::random();
         let v2 : u64 = rand::random();
-        let tmp_name = format!(".tmp.{}{}", v1, v2);
-        let tmp_path = dir.clone().join(tmp_name);
-        TmpFile { file: OpenOptions::new().write(true).create_new(true).open(&tmp_path).unwrap()
-                , tmp_path: tmp_path
-                }
+        path.join(format!(".tmp.{}{}", v1, v2));
+
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map(|file| TmpFile { file: file, path: path })
     }
 
-    pub fn render_permanent(&self, path: &PathBuf) {
+    pub fn render_permanent(&self, path: &PathBuf) -> io::Result<()> {
         // here we consider that the rename is atomic, which might depends on filesystem
-        fs::rename(&self.tmp_path, path).unwrap();
+        fs::rename(&self.path, path)
     }
 }
-
-//impl Write for TmpFile {
-//}
+impl io::Read for TmpFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.file.read(buf)
+    }
+}
+impl io::Write for TmpFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> { self.file.flush() }
+}
 
 fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile {
-    TmpFile::create(&storage.get_filetype_dir(filetype))
+    TmpFile::create(storage.get_filetype_dir(filetype)).unwrap()
 }
 
 pub mod blob {
@@ -129,6 +138,8 @@ pub mod pack {
     // FANOUT (256*8 bytes)
     // BLOCK HASHES present in this pack ordered lexigraphically (#ENTRIES * 32 bytes)
     // OFFSET of BLOCK in the same order as BLOCK_HASHES (#ENTRIES * 8 bytes)
+
+    use super::{TmpFile};
 
     use std::iter::repeat;
     use std::io::SeekFrom;
@@ -171,7 +182,7 @@ pub mod pack {
           | ((buf[7] as u64))
     }
 
-    pub fn create_index(storage: &super::Storage, hashes: &[super::BlockHash], sizes: &[Size]) -> super::TmpFile {
+    pub fn create_index(storage: &super::Storage, hashes: &[super::BlockHash], sizes: &[Size]) -> TmpFile {
         let mut tmpfile = super::tmpfile_create_type(storage, super::StorageFileType::Index);
         let mut hdr_buf = [0u8;32];
 
@@ -184,7 +195,7 @@ pub mod pack {
         // * magic (8 bytes)
         // * number of entries (8 bytes)
         // * 16 bytes of 0 padding
-        tmpfile.file.write_all(&hdr_buf).unwrap();
+        tmpfile.write_all(&hdr_buf).unwrap();
 
         // write fanout
         let mut fanout = [0u64;256];
@@ -265,7 +276,7 @@ pub mod pack {
     }
 
     pub struct PackWriter {
-        tmpfile: super::TmpFile,
+        tmpfile: TmpFile,
         index: Index,
         pos: u64,
         hash_context: blake2b::Blake2b, // hash of all the content of blocks without length or padding
@@ -274,7 +285,7 @@ pub mod pack {
 
     impl PackWriter {
         pub fn init(storage: &super::Storage) -> Self {
-            let tmpfile = super::TmpFile::create(&storage.get_filetype_dir(super::StorageFileType::Pack));
+            let tmpfile = TmpFile::create(storage.get_filetype_dir(super::StorageFileType::Pack)).unwrap();
             let idx = Index::new();
             let ctxt = blake2b::Blake2b::new(32);
             PackWriter
