@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate serde_yaml;
 extern crate rcw;
 extern crate wallet_crypto;
+extern crate protocol;
 extern crate rand;
 
 mod config;
@@ -12,10 +13,12 @@ mod account;
 mod command;
 mod wallet;
 mod storage;
+mod network;
 
 use config::{Config};
 use command::{HasCommand};
 use wallet::{Wallet};
+use network::{Network};
 
 use std::env::{home_dir};
 use std::path::{PathBuf};
@@ -30,6 +33,7 @@ fn main() {
         .arg(Arg::with_name("config").short("c").long("config").value_name("FILE").help("Sets a custom config file").takes_value(true))
         .subcommand(Config::clap_options())
         .subcommand(Wallet::clap_options())
+        .subcommand(Network::clap_options())
         .get_matches();
 
     let cfg_path = matches.value_of("config")
@@ -47,6 +51,7 @@ fn main() {
                 cfg2.to_file(&cfg_path);
             };
         },
+        ("network", Some(sub_matches)) => { Network::run(cfg, sub_matches); },
         _ => {
             println!("{}", matches.usage());
             ::std::process::exit(1);
