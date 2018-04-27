@@ -134,7 +134,7 @@ impl cbor::CborValue for HandlerSpecs {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.object().and_then(|object| {
             let mut bm = BTreeMap::new();
-            for (cbor::ObjectKey::Integer(k), v) in object.iter() {
+            for (&cbor::ObjectKey::Integer(ref k), v) in object.iter() {
                 bm.insert(*k as u32, cbor::CborValue::decode(v.clone())?);
             }
             Ok(HandlerSpecs(bm))
