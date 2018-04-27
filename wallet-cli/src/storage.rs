@@ -201,7 +201,6 @@ pub mod pack {
         tmpfile.file.write_all(&fanout_buf).unwrap();
 
         for &hash in hashes.iter() {
-            //buf[0..HASH_SIZE].clone_from_slice(&hash[..]);
             tmpfile.file.write_all(&hash[..]).unwrap();
         }
 
