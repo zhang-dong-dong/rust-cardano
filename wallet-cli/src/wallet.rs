@@ -5,7 +5,7 @@ use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use account::{Account};
-use storage::{Storage, StorageConfig};
+use storage::{Storage, StorageConfig, pack_blobs};
 use rand;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,6 +43,9 @@ impl HasCommand for Wallet {
                 .about("internal debug command")
                 .arg(Arg::with_name("packhash").help("pack to query").index(1))
             )
+            .subcommand(SubCommand::with_name("pack")
+                .about("internal pack command")
+            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         let mut cfg = config;
@@ -70,6 +73,13 @@ impl HasCommand for Wallet {
                 }
                 Some(cfg)
             },
+            ("pack", _) => {
+                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
+                let mut storage = Storage::init(&store_config).unwrap();
+                let packhash = pack_blobs(&mut storage);
+                println!("pack created: {}", encode(&packhash));
+                Some(cfg)
+            }
             ("address", Some(opts)) => {
                 // expect existing wallet
                 assert!(cfg.wallet.is_some());

@@ -217,10 +217,41 @@ pub mod blob {
         let p = storage.config.get_blob_filepath(hash);
         p.as_path().exists()
     }
+
+    pub fn remove(storage: &super::Storage, hash: &super::BlockHash) {
+        let p = storage.config.get_blob_filepath(hash);
+        match fs::remove_file(p) {
+            Ok(()) => {},
+            Err(_) => {},
+        }
+    }
 }
 
 pub fn read_block(storage: &Storage, hash: &BlockHash) -> Vec<u8> {
+    //storage.fanouts
     blob::read(storage, hash)
+}
+
+pub fn pack_blobs(storage: &mut Storage) -> PackHash {
+    let mut writer = pack::PackWriter::init(&storage.config);
+    let block_hashes = storage.config.list_blob(Some(1024));
+    for bh in block_hashes.iter() {
+        let blob = blob::read(storage, bh);
+        writer.append(bh, &blob[..]);
+    }
+
+    let (packhash, index) = writer.finalize();
+
+    let (fanout, tmpfile) = pack::create_index(storage, &index);
+    tmpfile.render_permanent(&storage.config.get_index_filepath(&packhash));
+
+    for bh in block_hashes.iter() {
+        //blob::remove(storage, bh);
+    }
+
+    // append to fanout
+    storage.fanouts.push((packhash, fanout));
+    packhash
 }
 
 pub mod pack {
@@ -319,7 +350,7 @@ pub mod pack {
         buf
     }
 
-    pub fn create_index(storage: &super::Storage, index: &Index) -> super::TmpFile {
+    pub fn create_index(storage: &super::Storage, index: &Index) -> (Fanout, super::TmpFile) {
         let mut tmpfile = super::tmpfile_create_type(storage, super::StorageFileType::Index);
         let mut hdr_buf = [0u8;32];
         let entries = index.hashes.len();
@@ -336,25 +367,31 @@ pub mod pack {
         tmpfile.write_all(&hdr_buf).unwrap();
 
         // write fanout
-        let mut fanout = [0u64;256];
-        for &hash in index.hashes.iter() {
-            let ofs = hash[0] as usize;
-            fanout[ofs] = fanout[ofs]+1;
-        }
+        let fanout = {
+            let mut fanout_abs = [0u64;256];
+            for &hash in index.hashes.iter() {
+                let ofs = hash[0] as usize;
+                fanout_abs[ofs] = fanout_abs[ofs]+1;
+            }
+            let mut fanout_sum = 0;
+            let mut fanout_incr = [0u64;256];
+            for i in 0..256 {
+                fanout_sum += fanout_abs[i];
+                fanout_incr[i] = fanout_sum;
+            }
 
-        let mut fanout_buf = [0u8;256*8];
-        let mut fanout_sum = 0;
-        for i in 0..256 {
-            let ofs = i * 8;
-            let abs = fanout[i];
-            fanout_sum += abs;
-            write_size(&mut fanout_buf[ofs..ofs+8], fanout_sum);
-        }
-        tmpfile.file.write_all(&fanout_buf).unwrap();
+            let mut fanout_buf = [0u8;256*8];
+            for i in 0..256 {
+                let ofs = i * 8;
+                write_size(&mut fanout_buf[ofs..ofs+8], fanout_incr[i]);
+            }
+            tmpfile.file.write_all(&fanout_buf).unwrap();
+            Fanout(fanout_incr)
+        };
 
         let mut sorted = Vec::with_capacity(entries);
         for i in 0..entries {
-            sorted[i] = (index.hashes[i], index.offsets[i]);
+            sorted.push((index.hashes[i], index.offsets[i]));
         }
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -367,7 +404,7 @@ pub mod pack {
             write_size(&mut buf, ofs);
             tmpfile.file.write_all(&buf[..]).unwrap();
         }
-        tmpfile
+        (fanout, tmpfile)
     }
 
     pub fn read_index_fanout(storage: &super::Storage, pack: &super::PackHash) -> Fanout {
