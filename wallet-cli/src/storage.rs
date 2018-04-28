@@ -32,13 +32,24 @@ pub enum StorageFileType {
 
 impl Storage {
     pub fn init(cfg: &StorageConfig) -> io::Result<Self> {
-        let storage = Storage { config: cfg.clone(), fanouts: Vec::new() };
+        let mut fanouts = Vec::new();
 
         fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Blob))?;
         fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Index))?;
         fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Pack))?;
         fs::create_dir_all(cfg.get_filetype_dir(StorageFileType::Tag))?;
 
+        let packhashes = cfg.list_indexes();
+        for p in packhashes.iter() {
+            match pack::read_index_fanout(&cfg, p) {
+                Err(_)     => {},
+                Ok(fanout) => {
+                    fanouts.push((*p, fanout))
+                }
+            }
+        }
+
+        let storage = Storage { config: cfg.clone(), fanouts: fanouts };
         Ok(storage)
     }
 }
@@ -147,7 +158,10 @@ impl TmpFile {
 
     pub fn render_permanent(&self, path: &PathBuf) -> io::Result<()> {
         // here we consider that the rename is atomic, which might depends on filesystem
-        fs::rename(&self.path, path)
+        if !path.as_path().exists() {
+            fs::rename(&self.path, path)?;
+        };
+        Ok(())
     }
 }
 impl io::Read for TmpFile {
@@ -207,7 +221,7 @@ pub mod blob {
     pub fn read(storage: &super::Storage, hash: &super::BlockHash) -> Vec<u8> {
         let mut content = Vec::new();
         let path = storage.config.get_blob_filepath(&hash);
-        
+
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
         content
@@ -269,12 +283,14 @@ pub mod pack {
 
     use std::iter::repeat;
     use std::io::SeekFrom;
+    use std::io;
     use std::io::{Write,Read,Seek};
     use std::fs;
     use storage::rcw::blake2b;
     use storage::rcw::digest::Digest;
 
     const MAGIC : &[u8] = b"ADAPACK1";
+    const MAGIC_SIZE : usize = 8;
     const OFF_SIZE : usize = 8;
 
     const IDX_OFS_FANOUT : u64 = 32;
@@ -345,6 +361,14 @@ pub mod pack {
         read_size(&buf)
     }
 
+    fn file_expect_magic(mut file: &fs::File) -> bool {
+        let mut buf = [0u8;MAGIC_SIZE];
+        match file.read_exact(&mut buf) {
+            Ok(()) => buf == MAGIC,
+            Err(_) => false
+        }
+    }
+
     fn file_read_hash(mut file: &fs::File) -> super::BlockHash {
         let mut buf = [0u8;super::HASH_SIZE];
         file.read_exact(&mut buf).unwrap();
@@ -408,18 +432,22 @@ pub mod pack {
         (fanout, tmpfile)
     }
 
-    pub fn read_index_fanout(storage: &super::Storage, pack: &super::PackHash) -> Fanout {
-        let mut file = fs::File::open(storage.config.get_index_filepath(pack)).unwrap();
-        file.seek(SeekFrom::Start(IDX_OFS_FANOUT)).unwrap();
+    pub fn read_index_fanout(storage_config: &super::StorageConfig, pack: &super::PackHash) -> io::Result<Fanout> {
+        let mut file = fs::File::open(storage_config.get_index_filepath(pack)).unwrap();
+        if !file_expect_magic(&mut file) {
+            return Err(io::Error::last_os_error());
+        }
+
+        file.seek(SeekFrom::Start(IDX_OFS_FANOUT))?;
         let mut buf = [0u8;256*8];
-        file.read_exact(&mut buf).unwrap();
+        file.read_exact(&mut buf)?;
 
         let mut fanout = [0u64;256]; 
         for i in 0..256 {
             let ofs = i*8;
             fanout[i] = read_size(&buf[ofs..ofs+8])
         }
-        Fanout(fanout)
+        Ok(Fanout(fanout))
     }
 
     pub fn search_index(mut file: &fs::File, blk: &super::BlockHash, start_elements: FanoutStart, hier_elements: FanoutNb) -> Option<IndexOffset> {
