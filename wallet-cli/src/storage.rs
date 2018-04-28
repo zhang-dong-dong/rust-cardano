@@ -158,9 +158,7 @@ impl TmpFile {
 
     pub fn render_permanent(&self, path: &PathBuf) -> io::Result<()> {
         // here we consider that the rename is atomic, which might depends on filesystem
-        if !path.as_path().exists() {
-            fs::rename(&self.path, path)?;
-        };
+        fs::rename(&self.path, path);
         Ok(())
     }
 }
