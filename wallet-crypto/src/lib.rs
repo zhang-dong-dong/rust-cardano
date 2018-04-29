@@ -13,6 +13,7 @@ pub mod paperwallet;
 pub mod address;
 pub mod hdpayload;
 pub mod tx;
+pub mod coin;
 
 pub mod cbor;
 pub mod bip44;

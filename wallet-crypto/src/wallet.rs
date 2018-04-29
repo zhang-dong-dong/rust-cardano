@@ -58,7 +58,7 @@ impl Wallet {
     ///
     pub fn gen_addresses(&self, account: u32, addr_type: AddrType, indices: Vec<u32>) -> Vec<address::ExtendedAddr>
     {
-        let addressing = Addressing::new(account, addr_type);
+        let addressing = Addressing::new(account, addr_type).unwrap();
 
         let change_prv = self.get_root_key()
             .derive(addressing.account)

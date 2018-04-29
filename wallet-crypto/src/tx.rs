@@ -14,6 +14,8 @@ use address::{ExtendedAddr, SpendingData};
 use hdpayload;
 use merkle;
 use bip44::{Addressing};
+use coin;
+use coin::{Coin};
 
 use serde;
 
@@ -121,68 +123,6 @@ impl<'de> serde::Deserialize<'de> for Hash
 // if this is confirmed, we need to make a proper type, wrapping it around
 // to hash a `Tx` by serializing it cbor first.
 pub type TxId = Hash;
-
-const MAX_COIN: u64 = 45000000000000000;
-
-// TODO: add custom implementation of `serde::de::Deserialize` so we can check the
-// upper bound of the `Coin`.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub struct Coin(u64);
-impl Coin {
-    pub fn zero() -> Self { Coin(0) }
-    pub fn new(v: u64) -> Option<Self> {
-        if v <= MAX_COIN { Some(Coin(v)) } else { None }
-    }
-}
-impl fmt::Display for Coin {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-impl cbor::CborValue for Coin {
-    fn encode(&self) -> cbor::Value { cbor::Value::U64(self.0) }
-    fn decode(value: cbor::Value) -> cbor::Result<Self> {
-        value.u64().and_then(|v| {
-            match Coin::new(v) {
-                Some(coin) => Ok(coin),
-                None       => cbor::Result::u64(v, cbor::Error::Between(0, MAX_COIN))
-            }
-        })
-    }
-}
-impl ops::Add for Coin {
-    type Output = Coin;
-    fn add(self, other: Coin) -> Self::Output {
-        Coin(self.0 + other.0)
-    }
-}
-impl<'a> ops::Add<&'a Coin> for Coin {
-    type Output = Coin;
-    fn add(self, other: &'a Coin) -> Self::Output {
-        Coin(self.0 + other.0)
-    }
-}
-impl ops::Sub for Coin {
-    type Output = Option<Coin>;
-    fn sub(self, other: Coin) -> Self::Output {
-        if other.0 > self.0 { None } else { Some(Coin(self.0 - other.0)) }
-    }
-}
-impl<'a> ops::Sub<&'a Coin> for Coin {
-    type Output = Option<Coin>;
-    fn sub(self, other: &'a Coin) -> Self::Output {
-        if other.0 > self.0 { None } else { Some(Coin(self.0 - other.0)) }
-    }
-}
-// this instance is necessary to chain the substraction operations
-//
-// i.e. `coin1 - coin2 - coin3`
-impl ops::Sub<Coin> for Option<Coin> {
-    type Output = Option<Coin>;
-    fn sub(self, other: Coin) -> Self::Output {
-        if other.0 > self?.0 { None } else { Some(Coin(self?.0 - other.0)) }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TxOut {
@@ -323,7 +263,9 @@ impl cbor::CborValue for TxInWitness {
                         Ok(TxInWitness::PkWitness(pk, sig))
                     }).embed("while decoding `TxInWitness::PkWitness`")
                 },
-                _ => { unimplemented!() }
+                _ => {
+                    cbor::Result::array(sum_type, cbor::Error::InvalidSumtype(v))
+                }
             }
         }).embed("While decoding TxInWitness")
     }
@@ -509,7 +451,9 @@ impl Outputs {
     pub fn is_empty(&self) -> bool { self.0.is_empty() }
     pub fn append(&mut self, other: &mut Self) { self.0.append(&mut other.0)}
 
-    pub fn total(&self) -> Coin { self.iter().fold(Coin::zero(), |acc, ref c| acc + c.value) }
+    pub fn total(&self) -> coin::Result<Coin> {
+        self.iter().fold(Coin::new(0), |acc, ref c| acc.and_then(|v| v + c.value))
+    }
 }
 impl convert::AsRef<Outputs> for Outputs {
     fn as_ref(&self) -> &Self { self }
@@ -605,7 +549,7 @@ pub mod fee {
             if inputs.is_empty() { return Err(Error::NoInputs); }
             if outputs.is_empty() { return Err(Error::NoOutputs); }
 
-            let output_value = outputs.total();
+            let output_value = outputs.total().unwrap();
             let mut fee = self.estimate(0);
             let mut input_value = Coin::zero();
             let mut selected_inputs = Inputs::new();
@@ -620,7 +564,7 @@ pub mod fee {
             assert!(policy == SelectionPolicy::FirstMatchFirst);
 
             for input in inputs.iter() {
-                input_value = input_value + input.value();
+                input_value = (input_value + input.value()).unwrap();
                 selected_inputs.push(input.clone());
                 txins.push_back(input.ptr.clone());
 
@@ -645,10 +589,10 @@ pub mod fee {
 
                 fee = corrected_fee;
 
-                if input_value >= (output_value + fee.to_coin()) { break; }
+                if Ok(input_value) >= (output_value + fee.to_coin()) { break; }
             }
 
-            if input_value < (output_value + fee.to_coin()) {
+            if Ok(input_value) < (output_value + fee.to_coin()) {
                 return Err(Error::NotEnoughInput);
             }
 

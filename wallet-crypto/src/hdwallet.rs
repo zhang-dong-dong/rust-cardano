@@ -9,7 +9,7 @@ use self::rcw::ed25519::signature_extended;
 use self::rcw::ed25519;
 use self::rcw::util::fixed_time_eq;
 
-use std::fmt;
+use std::{fmt, result};
 use std::marker::PhantomData;
 use util::{hex};
 use cbor;
@@ -24,6 +24,39 @@ pub const SIGNATURE_SIZE: usize = 64;
 
 pub const PUBLIC_KEY_SIZE: usize = 32;
 pub const CHAIN_CODE_SIZE: usize = 32;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum Error {
+    InvalidSeedSize(usize),
+    InvalidXPrvSize(usize),
+    InvalidXPubSize(usize),
+    ExpectedSoftDerivation,
+    InvalidDerivation
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Error::InvalidSeedSize(sz) => {
+               write!(f, "Invalid Seed Size, expected {} bytes, but received {} bytes.", SEED_SIZE, sz)
+            },
+            &Error::InvalidXPrvSize(sz) => {
+               write!(f, "Invalid XPrv Size, expected {} bytes, but received {} bytes.", XPRV_SIZE, sz)
+            },
+            &Error::InvalidXPubSize(sz) => {
+               write!(f, "Invalid XPub Size, expected {} bytes, but received {} bytes.", XPUB_SIZE, sz)
+            },
+            &Error::ExpectedSoftDerivation => {
+               write!(f, "expected soft derivation")
+            },
+            &Error::InvalidDerivation => {
+               write!(f, "invalid derivation")
+            },
+        }
+    }
+}
+
+pub type Result<T> = result::Result<T, Error>;
 
 /// Seed used to generate the root private key of the HDWallet.
 ///
@@ -50,17 +83,16 @@ impl Seed {
     /// let bytes = [0u8;SEED_SIZE];
     /// let wrong = [0u8;31];
     ///
-    /// assert!(Seed::from_slice(&wrong[..]).is_none());
-    /// assert!(Seed::from_slice(&bytes[..]).is_some());
+    /// assert!(Seed::from_slice(&wrong[..]).is_err());
+    /// assert!(Seed::from_slice(&bytes[..]).is_ok());
     /// ```
-    pub fn from_slice(buf: &[u8]) -> Option<Self> {
-        if buf.len() == SEED_SIZE {
-            let mut v = [0u8;SEED_SIZE];
-            v[..].clone_from_slice(buf);
-            Some(Seed::from_bytes(v))
-        } else {
-            None
+    pub fn from_slice(buf: &[u8]) -> Result<Self> {
+        if buf.len() != SEED_SIZE {
+            return Err(Error::InvalidSeedSize(buf.len()));
         }
+        let mut v = [0u8;SEED_SIZE];
+        v[..].clone_from_slice(buf);
+        Ok(Seed::from_bytes(v))
     }
 }
 impl AsRef<[u8]> for Seed {
@@ -114,16 +146,15 @@ impl XPrv {
     pub fn from_bytes(bytes: [u8;XPRV_SIZE]) -> Self { XPrv(bytes) }
 
     /// create a `XPrv` from the given slice. This slice must be of size `XPRV_SIZE`
-    /// otherwise it will return `Option::None`.
+    /// otherwise it will return `Result`.
     ///
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() == XPRV_SIZE {
-            let mut buf = [0u8;XPRV_SIZE];
-            buf[..].clone_from_slice(bytes);
-            Some(XPrv::from_bytes(buf))
-        } else {
-            None
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != XPRV_SIZE {
+            return Err(Error::InvalidXPrvSize(bytes.len()));
         }
+        let mut buf = [0u8;XPRV_SIZE];
+        buf[..].clone_from_slice(bytes);
+        Ok(XPrv::from_bytes(buf))
     }
 
     /// create a `XPrv` from a given hexadecimal string
@@ -133,10 +164,10 @@ impl XPrv {
     ///
     /// let xprv = XPrv::from_hex("301604045de9138b8b23b6730495f7e34b5151d29ba3456bc9b332f6f084a551d646bc30cf126fa8ed776c05a8932a5ab35c8bac41eb01bb9a16cfe229b94b405d3661deb9064f2d0e03fe85d68070b2fe33b4916059658e28ac7f7f91ca4b12");
     ///
-    /// assert!(xprv.is_some());
+    /// assert!(xprv.is_ok());
     /// ```
     ///
-    pub fn from_hex(hex: &str) -> Option<Self> {
+    pub fn from_hex(hex: &str) -> Result<Self> {
         Self::from_slice(hex::decode(hex).as_ref())
     }
 
@@ -203,7 +234,7 @@ impl AsRef<[u8]> for XPrv {
 impl serde::Serialize for XPrv
 {
     #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
         where S: serde::Serializer,
     {
         if serializer.is_human_readable() {
@@ -222,28 +253,30 @@ impl<'de> serde::de::Visitor<'de> for XPrvVisitor {
         write!(fmt, "Expecting an Extended Private Key (`XPrv`) of {} bytes.", XPRV_SIZE)
     }
 
-    fn visit_str<'a, E>(self, v: &'a str) -> Result<Self::Value, E>
+    fn visit_str<'a, E>(self, v: &'a str) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         let bytes = hex::decode(v);
 
         match XPrv::from_slice(&bytes) {
-            None => Err(E::invalid_length(bytes.len(), &"96 bytes")),
-            Some(xpub) => Ok(xpub)
+            Err(Error::InvalidXPubSize(sz)) => Err(E::invalid_length(sz, &"96 bytes")),
+            Err(err) => panic!("unexpected error happended: {}", err),
+            Ok(xpub) => Ok(xpub)
         }
     }
-    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         match XPrv::from_slice(v) {
-            None => Err(E::invalid_length(v.len(), &"96 bytes")),
-            Some(xpub) => Ok(xpub)
+            Err(Error::InvalidXPubSize(sz)) => Err(E::invalid_length(sz, &"96 bytes")),
+            Err(err) => panic!("unexpected error happended: {}", err),
+            Ok(xpub) => Ok(xpub)
         }
     }
 }
 impl<'de> serde::Deserialize<'de> for XPrv
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
         if deserializer.is_human_readable() {
@@ -304,7 +337,7 @@ impl XPub {
         ed25519::verify(message, &self.as_ref()[0..32], signature.as_ref())
     }
 
-    pub fn derive(&self, index: DerivationIndex) -> Result<Self, ()> {
+    pub fn derive(&self, index: DerivationIndex) -> Result<Self> {
         derive_public(self, index)
     }
 }
@@ -341,7 +374,7 @@ impl cbor::CborValue for XPub {
 impl serde::Serialize for XPub
 {
     #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
         where S: serde::Serializer,
     {
         serializer.serialize_bytes(self.as_ref())
@@ -356,7 +389,7 @@ impl<'de> serde::de::Visitor<'de> for XPubVisitor {
         write!(fmt, "Expecting an Extended Public Key (`XPub`) of {} bytes.", XPUB_SIZE)
     }
 
-    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         match XPub::from_slice(v) {
@@ -367,7 +400,7 @@ impl<'de> serde::de::Visitor<'de> for XPubVisitor {
 }
 impl<'de> serde::Deserialize<'de> for XPub
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
         deserializer.deserialize_bytes(XPubVisitor::new())
@@ -437,7 +470,7 @@ impl<T> cbor::CborValue for Signature<T> {
 impl<T> serde::Serialize for Signature<T>
 {
     #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
         where S: serde::Serializer,
     {
         serializer.serialize_bytes(self.as_ref())
@@ -452,7 +485,7 @@ impl<'de, T> serde::de::Visitor<'de> for SignatureVisitor<T> {
         write!(fmt, "Expected a signature (`Signature`) of {} bytes.", SIGNATURE_SIZE)
     }
 
-    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         match Signature::from_slice(v) {
@@ -463,7 +496,7 @@ impl<'de, T> serde::de::Visitor<'de> for SignatureVisitor<T> {
 }
 impl<'de, T> serde::Deserialize<'de> for Signature<T>
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
         deserializer.deserialize_bytes(SignatureVisitor::new())
@@ -622,7 +655,7 @@ fn point_of_trunc28_mul8(sk: &[u8]) -> GeP3 {
     a
 }
 
-fn derive_public(xpub: &XPub, index: DerivationIndex) -> Result<XPub, ()> {
+fn derive_public(xpub: &XPub, index: DerivationIndex) -> Result<XPub> {
     let pk = &xpub.as_ref()[0..32];
     let chaincode = &xpub.as_ref()[32..64];
 
@@ -639,7 +672,7 @@ fn derive_public(xpub: &XPub, index: DerivationIndex) -> Result<XPub, ()> {
             imac.input(&seri);
         }
         DerivationType::Hard(_) => {
-            return Err(());
+            return Err(Error::ExpectedSoftDerivation);
         }
     };
 
@@ -651,7 +684,7 @@ fn derive_public(xpub: &XPub, index: DerivationIndex) -> Result<XPub, ()> {
     let a = match GeP3::from_bytes_negate_vartime(pk) {
         Some(g) => g,
         None => {
-            return Err(());
+            return Err(Error::InvalidDerivation);
         }
     };
 
