@@ -115,7 +115,7 @@ impl fmt::Debug for Error {
             &Error::ObjectUndefinedElement(ref ok) => write!(f, "Key {:?} undefined", ok),
             &Error::InvalidSize(size) => write!(f, "invalid size, expected {:?}", size),
             &Error::NotOneOf(val) => write!(f, "Expected one of: {:?}", val),
-            &Error::InvalidSumtype(index) => write!(f, "expected sumtype's index {:?}", index),
+            &Error::InvalidSumtype(index) => write!(f, "invalid sumtype index {:?}", index),
             &Error::InvalidTag(tag) => write!(f, "expected tag id {:?}", tag),
             &Error::InvalidValue(ref val) => write!(f, "expected value {:?}", val),
             &Error::UnparsedValues => write!(f, "unparsed values"),
