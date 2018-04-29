@@ -14,6 +14,7 @@ use address::{ExtendedAddr, SpendingData};
 use hdpayload;
 use merkle;
 use bip44::{Addressing};
+use coin;
 use coin::{Coin};
 
 use serde;
@@ -450,7 +451,9 @@ impl Outputs {
     pub fn is_empty(&self) -> bool { self.0.is_empty() }
     pub fn append(&mut self, other: &mut Self) { self.0.append(&mut other.0)}
 
-    pub fn total(&self) -> Coin { self.iter().fold(Coin::zero(), |acc, ref c| acc + c.value) }
+    pub fn total(&self) -> coin::Result<Coin> {
+        self.iter().fold(Coin::new(0), |acc, ref c| acc.and_then(|v| v + c.value))
+    }
 }
 impl convert::AsRef<Outputs> for Outputs {
     fn as_ref(&self) -> &Self { self }
@@ -546,7 +549,7 @@ pub mod fee {
             if inputs.is_empty() { return Err(Error::NoInputs); }
             if outputs.is_empty() { return Err(Error::NoOutputs); }
 
-            let output_value = outputs.total();
+            let output_value = outputs.total().unwrap();
             let mut fee = self.estimate(0);
             let mut input_value = Coin::zero();
             let mut selected_inputs = Inputs::new();
@@ -561,7 +564,7 @@ pub mod fee {
             assert!(policy == SelectionPolicy::FirstMatchFirst);
 
             for input in inputs.iter() {
-                input_value = input_value + input.value();
+                input_value = (input_value + input.value()).unwrap();
                 selected_inputs.push(input.clone());
                 txins.push_back(input.ptr.clone());
 
@@ -586,10 +589,10 @@ pub mod fee {
 
                 fee = corrected_fee;
 
-                if input_value >= (output_value + fee.to_coin()) { break; }
+                if Ok(input_value) >= (output_value + fee.to_coin()) { break; }
             }
 
-            if input_value < (output_value + fee.to_coin()) {
+            if Ok(input_value) < (output_value + fee.to_coin()) {
                 return Err(Error::NotEnoughInput);
             }
 
