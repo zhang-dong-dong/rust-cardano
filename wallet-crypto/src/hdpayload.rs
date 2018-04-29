@@ -31,32 +31,6 @@ impl Path {
         cbor::decode_from_cbor(bytes)
     }
     fn cbor(&self) -> Vec<u8> { cbor::encode_to_cbor(self).unwrap() }
-
-    pub fn bip44_new(account: u32, change: u32, index: u32) -> Path {
-        Path(vec![BIP44_PURPOSE, BIP44_COIN_TYPE, account, change, index])
-    }
-    pub fn bip44_acount(&self) -> u32 {
-        assert!(self.as_ref().len() == BIP44_PATH_LENGTH);
-        self.0[2]
-    }
-    pub fn bip44_change(&self) -> u32 {
-        assert!(self.as_ref().len() == BIP44_PATH_LENGTH);
-        self.0[3]
-    }
-    pub fn bip44_index(&self) -> u32 {
-        assert!(self.as_ref().len() == BIP44_PATH_LENGTH);
-        self.0[4]
-    }
-    pub fn bip44_next(&self) -> Path {
-        assert!(self.as_ref().len() == BIP44_PATH_LENGTH);
-        let index = self.as_ref()[4];
-        Path::bip44_new(self.bip44_acount(), 0, self.bip44_index() + 1)
-    }
-    pub fn bip44_next_change(&self) -> Path {
-        assert!(self.as_ref().len() == BIP44_PATH_LENGTH);
-        let index = self.as_ref()[4];
-        Path::bip44_new(self.bip44_acount(), 1, self.bip44_index() + 1)
-    }
 }
 impl cbor::CborValue for Path {
     fn encode(&self) -> cbor::Value { cbor::Value::Array(self.0.iter().map(cbor::CborValue::encode).collect()) }
