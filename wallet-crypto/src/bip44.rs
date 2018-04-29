@@ -3,6 +3,17 @@
 /// provides all the logic to create safe sequential addresses
 /// using BIP44 specification.
 ///
+/// # Example
+///
+/// ```
+/// use wallet_crypto::bip44::{Account, Change, Addressing};
+///
+/// let addr = Account::new(0x80000000).unwrap()
+///     .external().unwrap()
+///     .index(0).unwrap();
+///
+/// assert!(addr.index =- 0);
+/// ```
 
 use hdpayload::{Path};
 use std::{fmt, result};
@@ -62,6 +73,38 @@ impl fmt::Display for Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct Account(u32);
+impl Account {
+    pub fn new(account: u32) -> Result<Self> {
+        if account  <  0x80000000 { return Err(Error::AccountOutOfBound(account)); }
+        Ok(Account(account))
+    }
+
+    pub fn internal(&self) -> Result<Change> {
+        Change::new(*self, 1)
+    }
+    pub fn external(&self) -> Result<Change> {
+        Change::new(*self, 0)
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct Change {
+    account: Account,
+    change:  u32
+}
+impl Change {
+    pub fn new(account: Account, change: u32) -> Result<Self> {
+        if change  >= 0x80000000 { return Err(Error::ChangeOutOfBound(change)); }
+        Ok(Change{ account: account, change: change })
+    }
+
+    pub fn index(&self, index: u32) -> Result<Addressing> {
+        Addressing::new_from_change(self, index)
+    }
+}
+
 /// Bip44 address derivation
 ///
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -97,6 +140,11 @@ impl Addressing {
                     };
         if account  <  0x80000000 { return Err(Error::AccountOutOfBound(account)); }
         Ok(Addressing { account: account, change: change, index: 0 })
+    }
+
+    fn new_from_change(change: &Change, index: u32) -> Result<Self> {
+        if index  >= 0x80000000 { return Err(Error::IndexOutOfBound(index)); }
+        Ok(Addressing{account: change.account.0, change: change.change, index: index})
     }
 
     /// return a path ready for derivation
