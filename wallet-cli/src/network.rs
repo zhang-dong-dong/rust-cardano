@@ -75,6 +75,7 @@ impl HasCommand for Network {
                 }).unwrap();
 
                 let hh = protocol::packet::HeaderHash::from_slice(&genesis_tag).expect("blockid invalid");
+                println!("getting block {}", hh);
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");

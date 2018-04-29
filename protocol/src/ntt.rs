@@ -20,11 +20,16 @@ impl EndPoint {
 pub struct Connection<W: Sized> {
     stream: W,
     drg: u64,
+    debug: bool,
 }
 
 impl<W: Sized+Write+Read> Connection<W> {
+    pub fn set_debug(&mut self) {
+        self.debug = true
+    }
+
     pub fn handshake(drg_seed: u64, stream: W) -> Result<Self,&'static str> {
-        let mut conn = Connection { stream: stream, drg: drg_seed };
+        let mut conn = Connection { stream: stream, drg: drg_seed, debug: false };
         let mut buf = vec![];
         protocol::handshake(&mut buf);
         conn.emit("handshake", &buf);
@@ -73,7 +78,9 @@ impl<W: Sized+Write+Read> Connection<W> {
 
     // emit utility
     fn emit(&mut self, step: &str, dat: &[u8]) {
-        println!("sending {} {:?}", step, dat);
+        if self.debug {
+            println!("NTT: {} {:?}", step, dat);
+        }
         self.stream.write_all(dat).unwrap();
     }
 
