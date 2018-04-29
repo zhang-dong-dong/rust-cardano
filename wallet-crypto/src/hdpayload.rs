@@ -16,10 +16,6 @@ const NONCE : &'static [u8] = b"serokellfore";
 const SALT  : &'static [u8] = b"address-hashing";
 const TAG_LEN : usize = 16;
 
-const BIP44_PATH_LENGTH: usize = 5;
-const BIP44_PURPOSE   : u32 = 0x8000002C;
-const BIP44_COIN_TYPE : u32 = 0x80000717;
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Path(Vec<u32>);
 impl AsRef<[u32]> for Path {

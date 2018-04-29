@@ -12,7 +12,7 @@
 ///     .external().unwrap()
 ///     .index(0).unwrap();
 ///
-/// assert!(addr.index =- 0);
+/// assert!(addr.index == 0);
 /// ```
 
 use hdpayload::{Path};
