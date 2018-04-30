@@ -46,7 +46,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub const HASH_SIZE : usize = 32;
 
 /// Blake2b 256 bits
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub struct Hash([u8;HASH_SIZE]);
 impl AsRef<[u8]> for Hash {
     fn as_ref(&self) -> &[u8] { self.0.as_ref() }
@@ -72,6 +72,11 @@ impl Hash {
     pub fn from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex)?;
         Self::from_slice(&bytes)
+    }
+}
+impl fmt::Debug for Hash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0[..]))
     }
 }
 impl fmt::Display for Hash {
@@ -718,13 +723,46 @@ impl cbor::CborValue for TxAux {
             Ok(TxAux::new(tx, witnesses))
         }).embed("While decoding TxAux.")
     }
-
 }
 
+#[derive(Debug)]
 pub struct TxProof {
-    number: u32,
-    root: merkle::Root<Tx>,
-    witnesses_hash: Hash,
+    pub number: u32,
+    pub root: Hash,
+    pub witnesses_hash: Hash,
+}
+impl TxProof {
+    pub fn new(number: u32, root: Hash, witnesses_hash: Hash) -> Self {
+        TxProof {
+            number: number,
+            root: root,
+            witnesses_hash: witnesses_hash
+        }
+    }
+}
+impl fmt::Display for TxProof {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "number: {}, root: {}, witnesses: {}", self.number, self.root, self.witnesses_hash)
+    }
+}
+impl cbor::CborValue for TxProof {
+    fn encode(&self) -> cbor::Value {
+        cbor::Value::Array(
+            vec![ cbor::CborValue::encode(&self.number)
+                , cbor::CborValue::encode(&self.root)
+                , cbor::CborValue::encode(&self.witnesses_hash)
+                ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, number)    = cbor::array_decode_elem(array, 0).embed("number")?;
+            let (array, root)      = cbor::array_decode_elem(array, 0).embed("root")?;
+            let (array, witnesses) = cbor::array_decode_elem(array, 0).embed("witnesses")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(TxProof::new(number, root, witnesses))
+        }).embed("While decoding TxAux.")
+    }
 }
 
 #[cfg(test)]

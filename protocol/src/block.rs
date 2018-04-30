@@ -1,7 +1,7 @@
 use std::collections::{LinkedList};
 use std::{fmt};
 use wallet_crypto::cbor::{Value, ExtendedResult};
-use wallet_crypto::{cbor, util};
+use wallet_crypto::{cbor, util, tx};
 use wallet_crypto::config::{ProtocolMagic};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -91,7 +91,7 @@ type Todo = Vec<Value>;
 pub struct MainBlockHeader {
     pub protocol_magic: ProtocolMagic,
     pub previous_header: HeaderHash,
-    pub body_proof: Todo,
+    pub body_proof: BodyProof,
     pub consensus: Todo,
     pub extra_data: Todo
 }
@@ -105,7 +105,7 @@ impl fmt::Display for MainBlockHeader {
     }
 }
 impl MainBlockHeader {
-   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: Todo, c: Todo, ed: Todo) -> Self {
+   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Todo, ed: Todo) -> Self {
         MainBlockHeader {
             protocol_magic: pm,
             previous_header: pb,
@@ -311,5 +311,61 @@ impl cbor::CborValue for Block {
                 cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
             }
         }).embed("While decoding block::Block")
+    }
+}
+
+#[derive(Debug)]
+pub enum SscProof {
+    CommitmentsProof(tx::Hash, tx::Hash),
+}
+impl cbor::CborValue for SscProof {
+    fn encode(&self) -> cbor::Value {
+        unimplemented!()
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+            if code == 0u64 {
+                let (array, commhash) = cbor::array_decode_elem(array, 0)?;
+                let (array, vss)      = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(SscProof::CommitmentsProof(commhash, vss))
+            } else {
+                cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
+            }
+        }).embed("While decoding block::Block")
+    }
+}
+
+#[derive(Debug)]
+pub struct BodyProof {
+    pub tx: tx::TxProof,
+    pub mpc: SscProof,
+    pub proxy_sk: tx::Hash, // delegation hash
+    pub update: tx::Hash, // UpdateProof (hash of UpdatePayload)
+}
+impl BodyProof {
+    pub fn new(tx: tx::TxProof, mpc: SscProof, proxy_sk: tx::Hash, update: tx::Hash) -> Self {
+        BodyProof {
+            tx: tx,
+            mpc: mpc,
+            proxy_sk: proxy_sk,
+            update: update
+        }
+    }
+}
+impl cbor::CborValue for BodyProof {
+    fn encode(&self) -> cbor::Value {
+        unimplemented!()
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, tx)  = cbor::array_decode_elem(array, 0).embed("tx")?;
+            let (array, mpc)  = cbor::array_decode_elem(array, 0).embed("mpc")?;
+            let (array, proxy_sk)  = cbor::array_decode_elem(array, 0).embed("proxy_sk")?;
+            let (array, update)  = cbor::array_decode_elem(array, 0).embed("update")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(BodyProof::new(tx, mpc, proxy_sk, update))
+        }).embed("While decoding BodyProof")
     }
 }

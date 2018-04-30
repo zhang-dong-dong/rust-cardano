@@ -50,7 +50,14 @@ impl HasCommand for Block {
                                         println!("### Header");
                                         println!("{} : {}"  , Green.paint("protocol magic"), hdr.protocol_magic);
                                         println!("{} : {}"  , Green.paint("previous hash "), hex::encode(hdr.previous_header.as_ref()));
-                                        println!("{} : {:?}", Green.paint("body proof    "), hdr.body_proof);
+                                        println!("{} :",      Green.paint("body proof    "));
+                                        println!("  - {} :", Cyan.paint("tx proof    "));
+                                        println!("       - {}: {}", Yellow.paint("number      "), hdr.body_proof.tx.number);
+                                        println!("       - {}: {}", Yellow.paint("root        "), hdr.body_proof.tx.root);
+                                        println!("       - {}: {}", Yellow.paint("witness hash"), hdr.body_proof.tx.witnesses_hash);
+                                        println!("  - {} : {:?}", Cyan.paint("mpc         "), hdr.body_proof.mpc);
+                                        println!("  - {} : {:?}", Cyan.paint("proxy sk    "), hdr.body_proof.proxy_sk);
+                                        println!("  - {} : {:?}", Cyan.paint("update      "), hdr.body_proof.update);
                                         println!("{} : {:?}", Green.paint("consensus     "), hdr.consensus);
                                         println!("{} : {:?}", Green.paint("extra-data    "), hdr.extra_data);
                                         println!("### Body");
