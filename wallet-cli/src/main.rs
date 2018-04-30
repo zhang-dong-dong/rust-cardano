@@ -7,6 +7,7 @@ extern crate rcw;
 extern crate wallet_crypto;
 extern crate protocol;
 extern crate rand;
+extern crate ansi_term;
 
 mod config;
 mod account;

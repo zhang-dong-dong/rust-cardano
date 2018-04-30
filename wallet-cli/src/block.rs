@@ -5,6 +5,8 @@ use config::{Config};
 use storage::{Storage, StorageConfig, blob, block_location, block_read_location};
 use wallet_crypto::cbor;
 
+use ansi_term::Colour::*;
+
 use protocol;
 use protocol::{packet};
 
@@ -41,7 +43,33 @@ impl HasCommand for Block {
                             Some(bytes) => {
                                 let blk : protocol::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
                                 println!("blk location: {:?}", loc);
-                                println!("{}", blk);
+                                match blk {
+                                    protocol::block::Block::MainBlock(mblock) => {
+                                        let hdr = mblock.header;
+                                        let body = mblock.body;
+                                        println!("### Header");
+                                        println!("{} : {}"  , Green.paint("protocol magic"), hdr.protocol_magic);
+                                        println!("{} : {}"  , Green.paint("previous hash "), hex::encode(hdr.previous_header.as_ref()));
+                                        println!("{} : {:?}", Green.paint("body proof    "), hdr.body_proof);
+                                        println!("{} : {:?}", Green.paint("consensus     "), hdr.consensus);
+                                        println!("{} : {:?}", Green.paint("extra-data    "), hdr.extra_data);
+                                        println!("### Body");
+                                        println!("{}", Green.paint("tx-payload"));
+                                        for e in body.tx.txaux.iter() {
+                                            println!("  {}", e);
+                                        }
+                                        println!("{} : {:?}", Green.paint("scc           "), body.scc);
+                                        println!("{} : {:?}", Green.paint("delegation    "), body.delegation);
+                                        println!("{} : {:?}", Green.paint("update        "), body.update);
+                                        println!("### Extra");
+                                        println!("{} : {:?}", Green.paint("extra         "), mblock.extra);
+                                        //println!("{}: {}", Red.paint("protocol magic:"), mblock.protocol.magic);
+                                    },
+                                }
+                                //println!("[header]");
+                                //println!("");
+                                //println!("{}: {}", Red.paint("hash"));
+                                //println!("{}", blk);
                             }
                         }
                     }

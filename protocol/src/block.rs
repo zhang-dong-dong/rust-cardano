@@ -85,7 +85,6 @@ impl cbor::CborValue for HeaderHash {
     }
 }
 
-
 type Todo = Vec<Value>;
 
 #[derive(Debug)]
@@ -180,7 +179,7 @@ pub mod main {
 
     #[derive(Debug)]
     pub struct TxPayload {
-        txaux: LinkedList<tx::TxAux>
+        pub txaux: LinkedList<tx::TxAux>
         // txs: LinkedList<tx::Tx>,
         // witnesses: LinkedList<Vec<tx::TxInWitness>>
     }
@@ -224,10 +223,10 @@ pub mod main {
 
     #[derive(Debug)]
     pub struct Body {
-        tx: TxPayload,
-        scc: cbor::Value,
-        delegation: cbor::Value,
-        update: cbor::Value
+        pub tx: TxPayload,
+        pub scc: cbor::Value,
+        pub delegation: cbor::Value,
+        pub update: cbor::Value
     }
     impl Body {
         pub fn new(tx: TxPayload, scc: cbor::Value, dlg: cbor::Value, upd: cbor::Value) -> Self {
