@@ -1,4 +1,4 @@
-use std::{fmt, ops, iter, vec, slice, convert};
+use std::{fmt, ops, iter, vec, slice, convert, result};
 use std::collections::{LinkedList, BTreeMap};
 
 use rcw::digest::Digest;
@@ -67,7 +67,7 @@ impl cbor::CborValue for Hash {
 impl serde::Serialize for Hash
 {
     #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
         where S: serde::Serializer,
     {
         if serializer.is_human_readable() {
@@ -86,7 +86,7 @@ impl<'de> serde::de::Visitor<'de> for HashVisitor {
         write!(fmt, "Expecting a Blake2b_256 hash (`Hash`)")
     }
 
-    fn visit_str<'a, E>(self, v: &'a str) -> Result<Self::Value, E>
+    fn visit_str<'a, E>(self, v: &'a str) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         let bytes = hex::decode(v);
@@ -97,7 +97,7 @@ impl<'de> serde::de::Visitor<'de> for HashVisitor {
         }
     }
 
-    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+    fn visit_bytes<'a, E>(self, v: &'a [u8]) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
         match Hash::from_slice(v) {
@@ -108,7 +108,7 @@ impl<'de> serde::de::Visitor<'de> for HashVisitor {
 }
 impl<'de> serde::Deserialize<'de> for Hash
 {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
         where D: serde::Deserializer<'de>
     {
         if deserializer.is_human_readable() {
@@ -508,9 +508,14 @@ pub mod fee {
         NoInputs,
         NoOutputs,
         NotEnoughInput,
+        CoinError(coin::Error)
     }
 
     type Result<T> = result::Result<T, Error>;
+
+    impl From<coin::Error> for Error {
+        fn from(e: coin::Error) -> Error { Error::CoinError(e) }
+    }
 
     pub trait Algorithm {
         fn compute(&self, policy: SelectionPolicy, inputs: &Inputs, outputs: &Outputs, change_addr: &ExtendedAddr, fee_addr: &ExtendedAddr) -> Result<(Fee, Inputs, Coin)>;
@@ -528,9 +533,10 @@ pub mod fee {
             LinearFee { constant: constant, coefficient: coefficient }
         }
 
-        pub fn estimate(&self, sz: usize) -> Fee {
+        pub fn estimate(&self, sz: usize) -> Result<Fee> {
             let fee = self.constant + self.coefficient * (sz as f64);
-            Fee(Coin::new(fee as u64).unwrap())
+            let coin = Coin::new(fee as u64)?;
+            Ok(Fee(coin))
         }
     }
     impl Default for LinearFee {
@@ -549,8 +555,8 @@ pub mod fee {
             if inputs.is_empty() { return Err(Error::NoInputs); }
             if outputs.is_empty() { return Err(Error::NoOutputs); }
 
-            let output_value = outputs.total().unwrap();
-            let mut fee = self.estimate(0);
+            let output_value = outputs.total()?;
+            let mut fee = self.estimate(0)?;
             let mut input_value = Coin::zero();
             let mut selected_inputs = Inputs::new();
 
@@ -564,7 +570,7 @@ pub mod fee {
             assert!(policy == SelectionPolicy::FirstMatchFirst);
 
             for input in inputs.iter() {
-                input_value = (input_value + input.value()).unwrap();
+                input_value = (input_value + input.value())?;
                 selected_inputs.push(input.clone());
                 txins.push_back(input.ptr.clone());
 
@@ -572,7 +578,7 @@ pub mod fee {
                 let mut tx = Tx::new_with(txins.clone(), txouts.clone());
                 let txbytes = cbor::encode_to_cbor(&tx).unwrap();
 
-                let estimated_fee = self.estimate(txbytes.len() + 5 + (42 * selected_inputs.len()));
+                let estimated_fee = (self.estimate(txbytes.len() + 5 + (42 * selected_inputs.len())))?;
 
                 // add the fee in the correction of the fee
                 tx.add_output(TxOut::new(fee_addr.clone(), estimated_fee.to_coin()));
@@ -587,7 +593,7 @@ pub mod fee {
                 let txbytes = cbor::encode_to_cbor(&tx).unwrap();
                 let corrected_fee = self.estimate(txbytes.len() + 5 + (42 * selected_inputs.len()));
 
-                fee = corrected_fee;
+                fee = corrected_fee?;
 
                 if Ok(input_value) >= (output_value + fee.to_coin()) { break; }
             }
