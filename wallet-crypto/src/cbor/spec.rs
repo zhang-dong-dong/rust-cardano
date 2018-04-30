@@ -134,6 +134,7 @@ pub trait ExtendedResult {
     fn embed(self, &'static str) -> Self;
     fn u64(v: u64, err: Error) -> Self;
     fn i64(v: i64, err: Error) -> Self;
+    fn text(v: String, err: Error) -> Self;
     fn bytes(v: Bytes, err: Error) -> Self;
     fn array(v: Vec<Value>, err: Error) -> Self;
     fn iarray(v: LinkedList<Value>, err: Error) -> Self;
@@ -148,6 +149,7 @@ impl<V> ExtendedResult for Result<V> {
     }
     fn u64(v: u64, err: Error) -> Self { Err((Value::U64(v), err)) }
     fn i64(v: i64, err: Error) -> Self { Err((Value::I64(v), err)) }
+    fn text(v: String, err: Error) -> Self { Err((Value::Text(v), err)) }
     fn bytes(v: Bytes, err: Error) -> Self { Err((Value::Bytes(v), err)) }
     fn array(v: Vec<Value>, err: Error) -> Self { Err((Value::Array(v), err)) }
     fn iarray(v: LinkedList<Value>, err: Error) -> Self { Err((Value::IArray(v), err)) }
@@ -207,6 +209,12 @@ impl Value {
         match self {
             Value::I64(v) => Ok(v),
             v              => Err((v, Error::ExpectedI64))
+        }
+    }
+    pub fn text(self) -> Result<String> {
+        match self {
+            Value::Text(v) => Ok(v),
+            v              => Err((v, Error::ExpectedText))
         }
     }
     pub fn bytes(self) -> Result<Bytes> {
@@ -288,6 +296,12 @@ impl CborValue for u64 {
     fn encode(&self)  -> Value { Value::U64(*self) }
     fn decode(v: Value) -> Result<Self> {
         v.u64().embed("while decoding `u64'")
+    }
+}
+impl CborValue for String {
+    fn encode(&self)  -> Value { Value::Text(self.clone()) }
+    fn decode(v: Value) -> Result<Self> {
+        v.text().embed("while decoding `text'")
     }
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]

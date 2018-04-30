@@ -93,7 +93,7 @@ pub struct MainBlockHeader {
     pub previous_header: HeaderHash,
     pub body_proof: BodyProof,
     pub consensus: Todo,
-    pub extra_data: Todo
+    pub extra_data: HeaderExtraData
 }
 impl fmt::Display for MainBlockHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -105,7 +105,7 @@ impl fmt::Display for MainBlockHeader {
     }
 }
 impl MainBlockHeader {
-   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Todo, ed: Todo) -> Self {
+   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Todo, ed: HeaderExtraData) -> Self {
         MainBlockHeader {
             protocol_magic: pm,
             previous_header: pb,
@@ -115,7 +115,6 @@ impl MainBlockHeader {
         }
    }
 }
-
 impl cbor::CborValue for MainBlockHeader {
     fn encode(&self) -> cbor::Value {
         unimplemented!()
@@ -129,6 +128,131 @@ impl cbor::CborValue for MainBlockHeader {
             let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
             if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
             Ok(MainBlockHeader::new(p_magic, prv_header, body_proof, consensus, extra_data))
+        }).embed("While decoding a MainBlockHeader")
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+pub struct BlockVersion(u16, u16, u8);
+impl BlockVersion {
+    pub fn new(major: u16, minor: u16, revision: u8) -> Self {
+        BlockVersion(major, minor, revision)
+    }
+}
+impl fmt::Debug for BlockVersion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.0, self.1, self.2)
+    }
+}
+impl fmt::Display for BlockVersion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl Default for BlockVersion {
+    fn default() -> Self { BlockVersion::new(0,1,0) }
+}
+impl cbor::CborValue for BlockVersion {
+    fn encode(&self) -> cbor::Value {
+        cbor::Value::Array(
+            vec![
+                cbor::CborValue::encode(&self.0),
+                cbor::CborValue::encode(&self.1),
+                cbor::CborValue::encode(&self.2),
+            ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, major)    = cbor::array_decode_elem(array, 0).embed("major")?;
+            let (array, minor)    = cbor::array_decode_elem(array, 0).embed("minor")?;
+            let (array, revision) = cbor::array_decode_elem(array, 0).embed("revision")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(BlockVersion::new(major, minor, revision))
+        }).embed("While decoding a BlockVersion")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct SoftwareVersion {
+    application_name: String,
+    application_version: u32
+}
+impl SoftwareVersion {
+    pub fn new(name: String, version: u32) -> Self {
+        SoftwareVersion {
+            application_name: name,
+            application_version: version
+        }
+    }
+}
+impl Default for SoftwareVersion {
+    fn default() -> Self {
+        SoftwareVersion::new(
+            env!("CARGO_PKG_NAME").to_string(),
+            env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap()
+        )
+    }
+}
+impl cbor::CborValue for SoftwareVersion {
+    fn encode(&self) -> cbor::Value {
+        cbor::Value::Array(
+            vec![
+                cbor::CborValue::encode(&self.application_name),
+                cbor::CborValue::encode(&self.application_version),
+            ]
+        )
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, name)    = cbor::array_decode_elem(array, 0).embed("name")?;
+            let (array, version) = cbor::array_decode_elem(array, 0).embed("version")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(SoftwareVersion::new(name, version))
+        }).embed("While decoding a SoftwareVersion")
+    }
+}
+
+#[derive(Debug)]
+pub struct BlockHeaderAttributes(cbor::Value);
+impl cbor::CborValue for BlockHeaderAttributes {
+    fn encode(&self) -> cbor::Value {
+        self.0.clone()
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        Ok(BlockHeaderAttributes(value))
+    }
+}
+
+#[derive(Debug)]
+pub struct HeaderExtraData {
+    pub block_version: BlockVersion,
+    pub software_version: SoftwareVersion,
+    pub attributes: BlockHeaderAttributes,
+    pub extra_data_proof: tx::Hash // hash of the Extra body data
+}
+impl HeaderExtraData {
+    pub fn new(block_version: BlockVersion, software_version: SoftwareVersion, attributes: BlockHeaderAttributes, extra_data_proof: tx::Hash) -> Self {
+        HeaderExtraData {
+            block_version: block_version,
+            software_version: software_version,
+            attributes: attributes,
+            extra_data_proof: extra_data_proof
+        }
+    }
+}
+impl cbor::CborValue for HeaderExtraData {
+    fn encode(&self) -> cbor::Value {
+        unimplemented!()
+    }
+    fn decode(value: cbor::Value) -> cbor::Result<Self> {
+        value.array().and_then(|array| {
+            let (array, block_version)    = cbor::array_decode_elem(array, 0).embed("block version")?;
+            let (array, software_version) = cbor::array_decode_elem(array, 0).embed("software version")?;
+            let (array, attributes)       = cbor::array_decode_elem(array, 0).embed("attributes")?;
+            let (array, extra_data_proof) = cbor::array_decode_elem(array, 0).embed("extra data proof")?;
+            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+            Ok(HeaderExtraData::new(block_version, software_version, attributes, extra_data_proof))
         }).embed("While decoding a MainBlockHeader")
     }
 }
