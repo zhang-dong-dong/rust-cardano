@@ -8,6 +8,7 @@ use util::hex;
 use cbor;
 use cbor::{ExtendedResult};
 use config::{Config};
+use redeem;
 
 use hdwallet::{Signature, XPub, XPrv};
 use address::{ExtendedAddr, SpendingData};
@@ -191,8 +192,6 @@ impl cbor::CborValue for TxOut {
 type TODO = u8;
 type ValidatorScript = TODO;
 type RedeemerScript = TODO;
-type RedeemPublicKey = TODO;
-type RedeemSignature = TODO;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum TxInWitness {
@@ -200,7 +199,7 @@ pub enum TxInWitness {
     /// the `XPub` is the public key set in the AddrSpendingData
     PkWitness(XPub, Signature<Tx>),
     ScriptWitness(ValidatorScript, RedeemerScript),
-    RedeemWitness(RedeemPublicKey, RedeemSignature),
+    RedeemWitness(redeem::PublicKey, redeem::Signature),
 }
 impl fmt::Display for TxInWitness {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -229,7 +228,12 @@ impl TxInWitness {
                 &ea == address
             },
             &TxInWitness::ScriptWitness(_, _) => { unimplemented!() },
-            &TxInWitness::RedeemWitness(_, _) => { unimplemented!() },
+            &TxInWitness::RedeemWitness(ref pk, _) => {
+                let sd = SpendingData::RedeemASD(pk.clone());
+                let ea = ExtendedAddr::new(address.addr_type, sd, address.attributes.clone());
+
+                &ea == address
+            },
         }
     }
 
@@ -247,7 +251,15 @@ impl TxInWitness {
                 pk.verify(&vec, sig)
             },
             &TxInWitness::ScriptWitness(_, _) => { unimplemented!() },
-            &TxInWitness::RedeemWitness(_, _) => { unimplemented!() },
+            &TxInWitness::RedeemWitness(ref pk, ref sig) => {
+                let txid = cbor::encode_to_cbor(&tx.id()).unwrap();
+
+                let mut vec = vec![ 0x01 ]; // this is the tag for TxSignature
+                vec.extend_from_slice(&cbor::encode_to_cbor(&cfg.protocol_magic).unwrap());
+                vec.extend_from_slice(&txid);
+
+                pk.verify(sig, &vec)
+            },
         }
     }
 
@@ -268,7 +280,14 @@ impl cbor::CborValue for TxInWitness {
                 (0u64, cbor::encode_to_cbor(&v).unwrap())
             },
             &TxInWitness::ScriptWitness(_, _) => { unimplemented!() },
-            &TxInWitness::RedeemWitness(_, _) => { unimplemented!() },
+            &TxInWitness::RedeemWitness(ref pk, ref sig) => {
+                let v = cbor::Value::Array(
+                    vec![ cbor::CborValue::encode(pk)
+                        , cbor::CborValue::encode(sig)
+                        ]
+                );
+                (2u64, cbor::encode_to_cbor(&v).unwrap())
+            }
         };
         cbor::Value::Array(
             vec![ cbor::CborValue::encode(&i)
@@ -290,6 +309,17 @@ impl cbor::CborValue for TxInWitness {
                         let (pk, sig) = cbor::decode_from_cbor(bytes.as_ref())?;
                         Ok(TxInWitness::PkWitness(pk, sig))
                     }).embed("while decoding `TxInWitness::PkWitness`")
+                },
+                2u64 => {
+                    let (sum_type, tag) : (Vec<cbor::Value>, cbor::Value) = cbor::array_decode_elem(sum_type, 0).embed("sum_type's value")?;
+                    if !sum_type.is_empty() { return cbor::Result::array(sum_type, cbor::Error::UnparsedValues); }
+                    tag.tag().and_then(|(t, v)| {
+                        if t != 24 { return cbor::Result::tag(t, v, cbor::Error::InvalidTag(t)); }
+                        (*v).bytes()
+                    }).and_then(|bytes| {
+                        let (pk, sig) = cbor::decode_from_cbor(bytes.as_ref())?;
+                        Ok(TxInWitness::RedeemWitness(pk, sig))
+                    }).embed("while decoding `TxInWitness::RedeemWitness`")
                 },
                 _ => {
                     cbor::Result::array(sum_type, cbor::Error::InvalidSumtype(v))

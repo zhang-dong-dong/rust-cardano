@@ -185,10 +185,11 @@ fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile 
 pub mod tag {
     use std::fs;
     use std::io::{Write,Read};
+    use wallet_crypto::util::{hex};
 
     pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
         let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
-        tmp_file.file.write_all(content).unwrap();
+        tmp_file.file.write_all(hex::encode(content).as_bytes()).unwrap();
         tmp_file.render_permanent(&storage.config.get_tag_filepath(name));
     }
 
@@ -198,7 +199,9 @@ pub mod tag {
         let path = storage.config.get_tag_filepath(name);
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
-        Some(content)
+        String::from_utf8(content.clone()).ok()
+            .and_then(|r| hex::decode(&r).ok())
+            .or(Some(content))
     }
 
     pub fn exist(storage: &super::Storage, name: &str) -> bool {

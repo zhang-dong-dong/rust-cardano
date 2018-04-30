@@ -6,6 +6,7 @@ use rcw::digest::Digest;
 use rcw::blake2b::Blake2b;
 use rcw::sha3::Sha3;
 
+use redeem;
 use util::{base58};
 use cbor;
 use cbor::{ExtendedResult};
@@ -413,7 +414,6 @@ impl<'de> serde::Deserialize<'de> for ExtendedAddr
 }
 
 pub type Script = [u8;32]; // TODO
-pub type RedeemPublicKey = [u8;32]; //TODO
 
 const SPENDING_DATA_TAG_PUBKEY : u64 = 0;
 const SPENDING_DATA_TAG_SCRIPT : u64 = 1; // TODO
@@ -423,7 +423,7 @@ const SPENDING_DATA_TAG_REDEEM : u64 = 2; // TODO
 pub enum SpendingData {
     PubKeyASD (XPub),
     ScriptASD (Script),
-    RedeemASD (RedeemPublicKey)
+    RedeemASD (redeem::PublicKey)
     // UnknownASD... whatever...
 }
 impl cbor::CborValue for SpendingData {
@@ -435,7 +435,10 @@ impl cbor::CborValue for SpendingData {
                 v.push(cbor::CborValue::encode(pk));
             },
             &SpendingData::ScriptASD(_)      => unimplemented!(),
-            &SpendingData::RedeemASD(_)      => unimplemented!(),
+            &SpendingData::RedeemASD(ref pk) => {
+                v.push(cbor::CborValue::encode(&SPENDING_DATA_TAG_REDEEM));
+                v.push(cbor::CborValue::encode(pk));
+            }
         };
         cbor::Value::Array(v)
     }
@@ -450,6 +453,13 @@ impl cbor::CborValue for SpendingData {
                     return cbor::Result::array(sum_type, cbor::Error::UnparsedValues);
                 }
                 Ok(SpendingData::PubKeyASD(pk))
+            } else if n == SPENDING_DATA_TAG_REDEEM {
+                let (sum_type, pk) = cbor::array_decode_elem(sum_type, 0)
+                    .embed("while decoding the public key")?;
+                if sum_type.len() != 0 {
+                    return cbor::Result::array(sum_type, cbor::Error::UnparsedValues);
+                }
+                Ok(SpendingData::RedeemASD(pk))
             } else {
                 cbor::Result::array(sum_type, cbor::Error::InvalidSumtype(n))
             }
