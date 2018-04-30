@@ -9,7 +9,7 @@ use std::net::TcpStream;
 
 use protocol;
 use protocol::packet;
-use protocol::packet::block;
+use protocol::block;
 use protocol::command::*;
 
 pub struct Network(protocol::Connection<TcpStream>);
@@ -58,7 +58,7 @@ impl HasCommand for Network {
             ("get-block", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
                 let hh_bytes = hex::decode(&hh_hex).unwrap();
-                let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
+                let hh = protocol::block::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");
@@ -74,15 +74,15 @@ impl HasCommand for Network {
                     tag::read(&storage, "HEAD")
                 }).unwrap();
 
-                let hh = protocol::packet::HeaderHash::from_slice(&genesis_tag).expect("blockid invalid");
+                let hh = protocol::block::HeaderHash::from_slice(&genesis_tag).expect("blockid invalid");
                 println!("getting block {}", hh);
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
                     .expect("to get one block at least");
                 blob::write(&storage, hh.bytes(), &b[2..]);
-                let blk : packet::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
+                let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
                 match blk {
-                    block::Block::MainBlock(blk) => {
+                    protocol::block::Block::MainBlock(blk) => {
                         tag::write(&storage, "GENESIS", blk.header.previous_header.as_ref());
                     }
                 }

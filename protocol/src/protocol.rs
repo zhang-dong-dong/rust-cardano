@@ -243,6 +243,7 @@ pub mod command {
     use std::io::{Read, Write};
     use super::{LightId, Connection};
     use wallet_crypto::cbor;
+    use block;
     use packet;
 
     pub trait Command<W: Read+Write> {
@@ -264,14 +265,14 @@ pub mod command {
     }
 
     #[derive(Debug)]
-    pub struct GetBlockHeader(Option<packet::HeaderHash>);
+    pub struct GetBlockHeader(Option<block::HeaderHash>);
     impl GetBlockHeader {
         pub fn first() -> Self { GetBlockHeader(None) }
-        pub fn some(hh: packet::HeaderHash) -> Self { GetBlockHeader(Some(hh)) }
+        pub fn some(hh: block::HeaderHash) -> Self { GetBlockHeader(Some(hh)) }
     }
 
     impl<W> Command<W> for GetBlockHeader where W: Read+Write {
-        type Output = packet::MainBlockHeader;
+        type Output = block::MainBlockHeader;
         fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
             // require the initial header
             let (get_header_id, get_header_dat) = packet::send_msg_getheaders(&[], &self.0);
@@ -297,7 +298,7 @@ pub mod command {
                         match l {
                             packet::BlockHeaderResponse::Ok(mut ll) =>
                                 match ll.pop_front() {
-                                    Some(packet::BlockHeader::MainBlockHeader(bh)) => Ok(bh),
+                                    Some(block::BlockHeader::MainBlockHeader(bh)) => Ok(bh),
                                     _  => Err("No first main block header")
                                 }
                         }
@@ -312,12 +313,12 @@ pub mod command {
 
     #[derive(Debug)]
     pub struct GetBlock {
-        from: packet::HeaderHash,
-        to:   packet::HeaderHash
+        from: block::HeaderHash,
+        to:   block::HeaderHash
     }
     impl GetBlock {
-        pub fn only(hh: packet::HeaderHash) -> Self { GetBlock::from(hh.clone(), hh) }
-        pub fn from(from: packet::HeaderHash, to: packet::HeaderHash) -> Self { GetBlock { from: from, to: to } }
+        pub fn only(hh: block::HeaderHash) -> Self { GetBlock::from(hh.clone(), hh) }
+        pub fn from(from: block::HeaderHash, to: block::HeaderHash) -> Self { GetBlock { from: from, to: to } }
     }
 
     impl<W> Command<W> for GetBlock where W: Read+Write {

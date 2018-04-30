@@ -26,7 +26,7 @@ impl HasCommand for Block {
             ("cat", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
                 let hh_bytes = hex::decode(&hh_hex).unwrap();
-                let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
+                let hh = protocol::block::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
                 let storage = Storage::init(&store_config).unwrap();
 
@@ -39,7 +39,7 @@ impl HasCommand for Block {
                         match block_read_location(&storage, &loc, hh.bytes()) {
                             None        => println!("error while reading"),
                             Some(bytes) => {
-                                let blk : packet::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
+                                let blk : protocol::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
                                 println!("blk location: {:?}", loc);
                                 println!("{}", blk);
                             }
