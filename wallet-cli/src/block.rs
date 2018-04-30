@@ -2,7 +2,7 @@ use wallet_crypto::util::{hex};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, StorageConfig, blob};
+use storage::{Storage, StorageConfig, blob, block_location, block_read_location};
 use wallet_crypto::cbor;
 
 use protocol;
@@ -29,14 +29,25 @@ impl HasCommand for Block {
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
                 let storage = Storage::init(&store_config).unwrap();
-                if ! blob::exist(&storage, hh.bytes()) {
-                    println!("Error: block `{}' does not exit", hh);
-                    ::std::process::exit(1);
-                }
-                let bytes = blob::read(&storage, hh.bytes());
 
-                let blk : packet::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
-                println!("{}", blk);
+                match block_location(&storage, hh.bytes()) {
+                    None => {
+                        println!("Error: block `{}' does not exit", hh);
+                        ::std::process::exit(1);
+                    },
+                    Some(loc) => {
+                        match block_read_location(&storage, &loc, hh.bytes()) {
+                            None        => println!("error while reading"),
+                            Some(bytes) => {
+                                let blk : packet::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
+                                println!("blk location: {:?}", loc);
+                                println!("{}", blk);
+                            }
+                        }
+                    }
+                }
+
+
             },
             _ => {
                 println!("{}", args.usage());

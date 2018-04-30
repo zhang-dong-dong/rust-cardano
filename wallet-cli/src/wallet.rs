@@ -1,11 +1,11 @@
 use wallet_crypto::{wallet, hdwallet, bip44};
-use wallet_crypto::util::hex::{encode};
+use wallet_crypto::util::hex::{encode, decode};
 use wallet_crypto::util::base58;
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use account::{Account};
-use storage::{Storage, StorageConfig, pack_blobs};
+use storage::{Storage, StorageConfig, pack_blobs, pack, PackParameters};
 use rand;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -68,7 +68,16 @@ impl HasCommand for Wallet {
                             println!("{}", encode(&v));
                         }
                     },
-                    Some(_) => {
+                    Some(opts) => {
+                        let packrefhex = opts.value_of("packhash")
+                            .and_then(|s| Some(s.to_string()))
+                            .unwrap();
+                        let mut packref = [0u8;32];
+                        packref.clone_from_slice(&decode(&packrefhex)[..]);
+                        let (fanout, refs) = pack::dump_index(&store_config, &packref).unwrap();
+                        for r in refs.iter() {
+                            println!("{}", encode(r));
+                        }
                     }
                 }
                 Some(cfg)
@@ -76,7 +85,12 @@ impl HasCommand for Wallet {
             ("pack", _) => {
                 let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
                 let mut storage = Storage::init(&store_config).unwrap();
-                let packhash = pack_blobs(&mut storage);
+                let pack_params = PackParameters {
+                    limit_nb_blobs: None,
+                    limit_size: None,
+                    delete_blobs_after_pack: false,
+                };
+                let packhash = pack_blobs(&mut storage, &pack_params);
                 println!("pack created: {}", encode(&packhash));
                 Some(cfg)
             }
