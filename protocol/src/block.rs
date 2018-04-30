@@ -3,6 +3,7 @@ use std::{fmt};
 use wallet_crypto::cbor::{Value, ExtendedResult};
 use wallet_crypto::{cbor, util, tx};
 use wallet_crypto::config::{ProtocolMagic};
+use wallet_crypto::hdwallet;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Version {
@@ -92,7 +93,7 @@ pub struct MainBlockHeader {
     pub protocol_magic: ProtocolMagic,
     pub previous_header: HeaderHash,
     pub body_proof: BodyProof,
-    pub consensus: Todo,
+    pub consensus: main::Consensus,
     pub extra_data: HeaderExtraData
 }
 impl fmt::Display for MainBlockHeader {
@@ -105,7 +106,7 @@ impl fmt::Display for MainBlockHeader {
     }
 }
 impl MainBlockHeader {
-   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Todo, ed: HeaderExtraData) -> Self {
+   pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: main::Consensus, ed: HeaderExtraData) -> Self {
         MainBlockHeader {
             protocol_magic: pm,
             previous_header: pb,
@@ -403,6 +404,85 @@ pub mod main {
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(Block::new(header, body, extra))
             }).embed("While decoding block::Block")
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct SlotId {
+        pub epoch: u32,
+        pub slotid: u32,
+    }
+
+    impl cbor::CborValue for SlotId {
+        fn encode(&self) -> cbor::Value {
+            unimplemented!()
+        }
+        fn decode(value: cbor::Value) -> cbor::Result<Self> {
+            value.array().and_then(|array| {
+                let (array, epoch) = cbor::array_decode_elem(array, 0).embed("epoch")?;
+                let (array, slotid) = cbor::array_decode_elem(array, 0).embed("slotid")?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(SlotId { epoch: epoch, slotid: slotid })
+            }).embed("While decoding Slotid")
+        }
+    }
+
+    type ChainDifficulty = u64;
+
+    type SignData = ();
+
+    #[derive(Debug)]
+    pub enum BlockSignature {
+        Signature(hdwallet::Signature<SignData>),
+        ProxyLight(Vec<cbor::Value>),
+        ProxyHeavy(Vec<cbor::Value>),
+    }
+    impl cbor::CborValue for BlockSignature {
+        fn encode(&self) -> cbor::Value {
+            unimplemented!()
+        }
+        fn decode(value: cbor::Value) -> cbor::Result<Self> {
+            value.array().and_then(|array| {
+                let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
+                match code {
+                    0u64 => {
+                        let (array, sig) = cbor::array_decode_elem(array,0).embed("")?;
+                        if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                        Ok(BlockSignature::Signature(sig))
+                    },
+                    1u64 => { Ok(BlockSignature::ProxyLight(array)) },
+                    2u64 => { Ok(BlockSignature::ProxyHeavy(array)) },
+                    _    => { cbor::Result::array(array, cbor::Error::UnparsedValues) },
+                }
+            }).embed("While decoding main::BlockSignature")
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Consensus {
+        slot_id: SlotId,
+        leader_key: hdwallet::XPub,
+        chain_difficulty: ChainDifficulty,
+        block_signature: BlockSignature,
+    }
+    impl cbor::CborValue for Consensus {
+        fn encode(&self) -> cbor::Value {
+            unimplemented!()
+        }
+        fn decode(value: cbor::Value) -> cbor::Result<Self> {
+            value.array().and_then(|array| {
+                let (array, slotid)  = cbor::array_decode_elem(array, 0).embed("slotid code")?;
+                let (array, leaderkey)  = cbor::array_decode_elem(array, 0).embed("leader key")?;
+                let (array, chain_difficulty) : (Vec<cbor::Value>, Vec<u64>) = cbor::array_decode_elem(array, 0).embed("chain difficulty")?;
+                let (array, block_signature) = cbor::array_decode_elem(array, 0).embed("block signature")?;
+
+                Ok(Consensus {
+                    slot_id: slotid,
+                    leader_key: leaderkey,
+                    chain_difficulty: chain_difficulty[0],
+                    block_signature: block_signature,
+                })
+            }).embed("While decoding main::Consensus")
         }
     }
 }
