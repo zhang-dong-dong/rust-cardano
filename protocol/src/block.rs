@@ -440,7 +440,10 @@ impl cbor::CborValue for Block {
 
 #[derive(Debug)]
 pub enum SscProof {
-    CommitmentsProof(tx::Hash, tx::Hash),
+    Commitments(tx::Hash, tx::Hash),
+    Openings(tx::Hash, tx::Hash),
+    Shares(tx::Hash, tx::Hash),
+    Certificate(tx::Hash)
 }
 impl cbor::CborValue for SscProof {
     fn encode(&self) -> cbor::Value {
@@ -453,7 +456,21 @@ impl cbor::CborValue for SscProof {
                 let (array, commhash) = cbor::array_decode_elem(array, 0)?;
                 let (array, vss)      = cbor::array_decode_elem(array, 0)?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
-                Ok(SscProof::CommitmentsProof(commhash, vss))
+                Ok(SscProof::Commitments(commhash, vss))
+            } else if code == 1u64 {
+                let (array, commhash) = cbor::array_decode_elem(array, 0)?;
+                let (array, vss)      = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(SscProof::Openings(commhash, vss))
+            } else if code == 2u64 {
+                let (array, commhash) = cbor::array_decode_elem(array, 0)?;
+                let (array, vss)      = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(SscProof::Shares(commhash, vss))
+            } else if code == 3u64 {
+                let (array, cert)      = cbor::array_decode_elem(array, 0)?;
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
+                Ok(SscProof::Certificate(cert))
             } else {
                 cbor::Result::array(array, cbor::Error::InvalidSumtype(code))
             }
