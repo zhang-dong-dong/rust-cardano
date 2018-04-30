@@ -4,46 +4,7 @@ use std::{fmt};
 use wallet_crypto::cbor::{encode_to_cbor, Value, ObjectKey, Bytes, ExtendedResult};
 use wallet_crypto::{cbor, util};
 use wallet_crypto::config::{ProtocolMagic};
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub struct Version {
-   major:    u32, 
-   minor:    u32, 
-   revision: u32, 
-}
-impl Version {
-    pub fn new(major: u32, minor: u32, revision: u32) -> Self {
-        Version { major: major, minor: minor, revision: revision }
-    }
-}
-impl Default for Version {
-    fn default() -> Self { Version::new(0,1,0) }
-}
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}.{}.{}", self.major, self.minor, self.revision)
-    }
-}
-impl cbor::CborValue for Version {
-    fn encode(&self) -> cbor::Value {
-        cbor::Value::Array(
-            vec![
-                cbor::CborValue::encode(&self.major),
-                cbor::CborValue::encode(&self.minor),
-                cbor::CborValue::encode(&self.revision),
-            ]
-        )
-    }
-    fn decode(value: cbor::Value) -> cbor::Result<Self> {
-        value.array().and_then(|array| {
-            let (array, major)    = cbor::array_decode_elem(array, 0).embed("major")?;
-            let (array, minor)    = cbor::array_decode_elem(array, 0).embed("minor")?;
-            let (array, revision) = cbor::array_decode_elem(array, 0).embed("revision")?;
-            if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
-            Ok(Version::new(major, minor, revision))
-        }).embed("while decoding Version")
-    }
-}
+use block;
 
 type MessageCode = u32;
 
@@ -153,12 +114,12 @@ impl fmt::Display for HandlerSpecs {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Handshake {
     pub protocol_magic: ProtocolMagic,
-    pub version: Version,
+    pub version: block::Version,
     pub in_handlers:  HandlerSpecs,
     pub out_handlers: HandlerSpecs
 }
 impl Handshake {
-    pub fn new(pm: ProtocolMagic, v: Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {
+    pub fn new(pm: ProtocolMagic, v: block::Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {
         Handshake {
             protocol_magic: pm,
             version: v,
@@ -179,7 +140,7 @@ impl Default for Handshake {
     fn default() -> Self {
         Handshake::new(
             ProtocolMagic::default(),
-            Version::default(),
+            block::Version::default(),
             HandlerSpecs::default_ins(),
             HandlerSpecs::default_outs(),
         )
@@ -438,7 +399,7 @@ impl cbor::CborValue for BlockHeaderResponse {
     }
 }
 
-pub mod block {
+pub mod xblock {
     pub mod main {
         use super::super::*;
         use wallet_crypto::{tx, cbor};
@@ -591,7 +552,7 @@ pub mod block {
 
 #[derive(Debug)]
 pub enum BlockResponse {
-    Ok(block::Block)
+    Ok(xblock::Block)
 }
 impl cbor::CborValue for BlockResponse {
     fn encode(&self) -> cbor::Value {
