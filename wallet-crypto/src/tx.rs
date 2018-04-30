@@ -19,6 +19,29 @@ use coin::{Coin};
 
 use serde;
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum Error {
+    InvalidHashSize(usize),
+    HexadecimalError(hex::Error),
+}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Error::InvalidHashSize(sz) => {
+                write!(f, "invalid hash size, expected {} but received {} bytes.", HASH_SIZE, sz)
+            },
+            &Error::HexadecimalError(err) => {
+                write!(f, "Invalid hexadecimal input: {}", err)
+            }
+        }
+    }
+}
+impl From<hex::Error> for Error {
+    fn from(e: hex::Error) -> Error { Error::HexadecimalError(e) }
+}
+
+pub type Result<T> = result::Result<T, Error>;
+
 pub const HASH_SIZE : usize = 32;
 
 /// Blake2b 256 bits
@@ -38,12 +61,16 @@ impl Hash {
     }
 
     pub fn from_bytes(bytes :[u8;HASH_SIZE]) -> Self { Hash(bytes) }
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != HASH_SIZE { return None; }
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != HASH_SIZE { return Err(Error::InvalidHashSize(bytes.len())); }
         let mut buf = [0;HASH_SIZE];
 
         buf[0..HASH_SIZE].clone_from_slice(bytes);
-        Some(Self::from_bytes(buf))
+        Ok(Self::from_bytes(buf))
+    }
+    pub fn from_hex(hex: &str) -> Result<Self> {
+        let bytes = hex::decode(hex)?;
+        Self::from_slice(&bytes)
     }
 }
 impl fmt::Display for Hash {
@@ -56,10 +83,11 @@ impl cbor::CborValue for Hash {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.bytes().and_then(|bytes| {
             match Hash::from_slice(bytes.as_ref()) {
-                Some(digest) => Ok(digest),
-                None         => {
-                    cbor::Result::bytes(bytes, cbor::Error::InvalidSize(32))
-                }
+                Ok(digest) => Ok(digest),
+                Err(Error::InvalidHashSize(_)) => {
+                    cbor::Result::bytes(bytes, cbor::Error::InvalidSize(HASH_SIZE))
+                },
+                Err(err) => panic!("unexpected error: {}", err)
             }
         }).embed("while decoding Hash")
     }
@@ -89,11 +117,10 @@ impl<'de> serde::de::Visitor<'de> for HashVisitor {
     fn visit_str<'a, E>(self, v: &'a str) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
-        let bytes = hex::decode(v);
-
-        match Hash::from_slice(&bytes) {
-            None => Err(E::invalid_length(bytes.len(), &"32 bytes")),
-            Some(r) => Ok(r)
+        match Hash::from_hex(v) {
+            Err(Error::HexadecimalError(err)) => Err(E::custom(format!("{}", err))),
+            Err(Error::InvalidHashSize(sz)) => Err(E::invalid_length(sz, &"32 bytes")),
+            Ok(h) => Ok(h)
         }
     }
 
@@ -101,8 +128,9 @@ impl<'de> serde::de::Visitor<'de> for HashVisitor {
         where E: serde::de::Error
     {
         match Hash::from_slice(v) {
-            None => Err(E::invalid_length(v.len(), &"32 bytes")),
-            Some(r) => Ok(r)
+            Err(Error::InvalidHashSize(sz)) => Err(E::invalid_length(sz, &"32 bytes")),
+            Err(err) => panic!("unexpected error: {}", err),
+            Ok(h) => Ok(h)
         }
     }
 }

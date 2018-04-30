@@ -1,5 +1,23 @@
 pub mod hex {
+    use std::{result, fmt};
+
     const ALPHABET : &'static [u8] = b"0123456789abcdef";
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+    pub enum Error {
+        UnknownSymbol(usize),
+    }
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                &Error::UnknownSymbol(idx) => {
+                    write!(f, "Unknown symbol at byte index {}", idx)
+                }
+            }
+        }
+    }
+
+    pub type Result<T> = result::Result<T, Error>;
 
     pub fn encode(input: &[u8]) -> String {
         let mut v = Vec::with_capacity(input.len() * 2);
@@ -12,7 +30,7 @@ pub mod hex {
             String::from_utf8_unchecked(v)
         }
     }
-    pub fn decode(input: &str) -> Vec<u8> {
+    pub fn decode(input: &str) -> Result<Vec<u8>> {
         let mut b = Vec::with_capacity(input.len() / 2);
         let mut modulus = 0;
         let mut buf = 0;
@@ -30,7 +48,7 @@ pub mod hex {
                 }
                 _ => {
                     // we only assume correct inputs
-                    unimplemented!()
+                    return Err(Error::UnknownSymbol(idx));
                 }
             }
 
@@ -41,7 +59,7 @@ pub mod hex {
             }
         }
 
-        b
+        Ok(b)
     }
 
     #[cfg(test)]
@@ -51,7 +69,7 @@ pub mod hex {
             assert_eq!(encoded, expected);
         }
         fn decode(expected: &[u8], input: &str) {
-            let decoded = super::decode(input);
+            let decoded = super::decode(input).unwrap();
             assert_eq!(decoded.as_slice(), expected);
         }
 

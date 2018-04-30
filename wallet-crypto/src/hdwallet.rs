@@ -30,6 +30,8 @@ pub enum Error {
     InvalidSeedSize(usize),
     InvalidXPrvSize(usize),
     InvalidXPubSize(usize),
+    InvalidSignatureSize(usize),
+    HexadecimalError(hex::Error),
     ExpectedSoftDerivation,
     InvalidDerivation
 }
@@ -46,6 +48,12 @@ impl fmt::Display for Error {
             &Error::InvalidXPubSize(sz) => {
                write!(f, "Invalid XPub Size, expected {} bytes, but received {} bytes.", XPUB_SIZE, sz)
             },
+            &Error::InvalidSignatureSize(sz) => {
+               write!(f, "Invalid Signature Size, expected {} bytes, but received {} bytes.", SIGNATURE_SIZE, sz)
+            },
+            &Error::HexadecimalError(err) => {
+               write!(f, "Invalid hexadecimal: {}.", err)
+            },
             &Error::ExpectedSoftDerivation => {
                write!(f, "expected soft derivation")
             },
@@ -54,6 +62,9 @@ impl fmt::Display for Error {
             },
         }
     }
+}
+impl From<hex::Error> for Error {
+    fn from(e: hex::Error) -> Error { Error::HexadecimalError(e) }
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -168,7 +179,8 @@ impl XPrv {
     /// ```
     ///
     pub fn from_hex(hex: &str) -> Result<Self> {
-        Self::from_slice(hex::decode(hex).as_ref())
+        let input = hex::decode(hex)?;
+        Self::from_slice(&input)
     }
 
     /// get te associated `XPub`
@@ -256,9 +268,8 @@ impl<'de> serde::de::Visitor<'de> for XPrvVisitor {
     fn visit_str<'a, E>(self, v: &'a str) -> result::Result<Self::Value, E>
         where E: serde::de::Error
     {
-        let bytes = hex::decode(v);
-
-        match XPrv::from_slice(&bytes) {
+        match XPrv::from_hex(v) {
+            Err(Error::HexadecimalError(err)) => Err(E::custom(format!("{}", err))),
             Err(Error::InvalidXPubSize(sz)) => Err(E::invalid_length(sz, &"96 bytes")),
             Err(err) => panic!("unexpected error happended: {}", err),
             Ok(xpub) => Ok(xpub)
@@ -297,14 +308,13 @@ impl XPub {
     /// create a `XPub` from the given slice. This slice must be of size `XPUB_SIZE`
     /// otherwise it will return `Option::None`.
     ///
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() == XPUB_SIZE {
-            let mut buf = [0u8;XPUB_SIZE];
-            buf[..].clone_from_slice(bytes);
-            Some(Self::from_bytes(buf))
-        } else {
-            None
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != XPUB_SIZE {
+            return Err(Error::InvalidXPubSize(bytes.len()));
         }
+        let mut buf = [0u8;XPUB_SIZE];
+        buf[..].clone_from_slice(bytes);
+        Ok(Self::from_bytes(buf))
     }
 
     /// create a `XPrv` from a given hexadecimal string
@@ -314,11 +324,12 @@ impl XPub {
     ///
     /// let xpub = XPub::from_hex("1c0c3ae1825e90b6ddda3f40a122c007e1008e83b2e102c142baefb721d72c1a5d3661deb9064f2d0e03fe85d68070b2fe33b4916059658e28ac7f7f91ca4b12");
     ///
-    /// assert!(xpub.is_some());
+    /// assert!(xpub.is_ok());
     /// ```
     ///
-    pub fn from_hex(hex: &str) -> Option<Self> {
-        Self::from_slice(hex::decode(hex).as_ref())
+    pub fn from_hex(hex: &str) -> Result<Self> {
+        let bytes = hex::decode(hex)?;
+        Self::from_slice(&bytes)
     }
 
     /// verify a signature
@@ -365,8 +376,9 @@ impl cbor::CborValue for XPub {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.bytes().and_then(|bytes| {
             match XPub::from_slice(bytes.as_ref()) {
-                Some(pk) => Ok(pk),
-                None     => cbor::Result::bytes(bytes, cbor::Error::InvalidSize(XPUB_SIZE))
+                Ok(pk) => Ok(pk),
+                Err(Error::InvalidXPubSize(_)) => cbor::Result::bytes(bytes, cbor::Error::InvalidSize(XPUB_SIZE)),
+                Err(err) => panic!("unexpected error happended: {}", err),
             }
         }).embed("while decoding `XPub`")
     }
@@ -393,8 +405,9 @@ impl<'de> serde::de::Visitor<'de> for XPubVisitor {
         where E: serde::de::Error
     {
         match XPub::from_slice(v) {
-            None => Err(E::invalid_length(v.len(), &"64 bytes")),
-            Some(xpub) => Ok(xpub)
+            Ok(pk) => Ok(pk),
+            Err(Error::InvalidXPubSize(sz)) => Err(E::invalid_length(sz, &"64 bytes")),
+            Err(err) => panic!("unexpected error happended: {}", err),
         }
     }
 }
@@ -419,18 +432,18 @@ impl<T> Signature<T> {
         Signature { bytes: bytes, _phantom: PhantomData }
     }
 
-    pub fn from_slice(bytes: &[u8]) -> Option<Self>  {
-        if bytes.len() == SIGNATURE_SIZE {
-            let mut buf = [0u8;SIGNATURE_SIZE];
-            buf[..].clone_from_slice(bytes);
-            Some(Self::from_bytes(buf))
-        } else {
-            None
+    pub fn from_slice(bytes: &[u8]) -> Result<Self>  {
+        if bytes.len() != SIGNATURE_SIZE {
+            return Err(Error::InvalidSignatureSize(bytes.len()))
         }
+        let mut buf = [0u8;SIGNATURE_SIZE];
+        buf[..].clone_from_slice(bytes);
+        Ok(Self::from_bytes(buf))
     }
 
-    pub fn from_hex(hex: &str) -> Option<Self> {
-        Self::from_slice(hex::decode(hex).as_ref())
+    pub fn from_hex(hex: &str) -> Result<Self> {
+        let bytes = hex::decode(hex)?;
+        Self::from_slice(&bytes)
     }
 
     pub fn coerce<R>(self) -> Signature<R> {
@@ -459,10 +472,9 @@ impl<T> cbor::CborValue for Signature<T> {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.bytes().and_then(|bytes| {
             match Signature::from_slice(bytes.as_ref()) {
-                Some(digest) => Ok(digest),
-                None         => {
-                    cbor::Result::bytes(bytes, cbor::Error::InvalidSize(SIGNATURE_SIZE))
-                }
+                Ok(sign) => Ok(sign),
+                Err(Error::InvalidSignatureSize(_)) => cbor::Result::bytes(bytes, cbor::Error::InvalidSize(SIGNATURE_SIZE)),
+                Err(err) => panic!("unexpected error happended: {}", err),
             }
         }).embed("while decoding Signature<T>")
     }
@@ -489,8 +501,9 @@ impl<'de, T> serde::de::Visitor<'de> for SignatureVisitor<T> {
         where E: serde::de::Error
     {
         match Signature::from_slice(v) {
-            None => Err(E::invalid_length(v.len(), &"64 bytes")),
-            Some(sig) => Ok(sig)
+            Ok(sign) => Ok(sign),
+            Err(Error::InvalidSignatureSize(sz)) => Err(E::invalid_length(sz, &"64 bytes")),
+            Err(err) => panic!("unexpected error happended: {}", err),
         }
     }
 }
