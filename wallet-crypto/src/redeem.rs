@@ -133,6 +133,9 @@ impl Signature {
         Self::from_slice(&bytes)
     }
 }
+impl Clone for Signature {
+    fn clone(&self) -> Self { Self::from_slice(self.as_ref()).unwrap() }
+}
 impl fmt::Debug for Signature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode(self.as_ref()))
