@@ -492,7 +492,7 @@ impl<'a> IntoIterator for &'a Outputs {
 pub mod fee {
     //! fee stabilisation related algorithm
 
-    use std::{result};
+    use std::{result, fmt};
     use super::*;
 
     /// fee
@@ -509,6 +509,16 @@ pub mod fee {
         NoOutputs,
         NotEnoughInput,
         CoinError(coin::Error)
+    }
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                &Error::NoInputs => write!(f, "No inputs given for fee estimation"),
+                &Error::NoOutputs => write!(f, "No outputs given for fee estimation"),
+                &Error::NotEnoughInput => write!(f, "Not enough funds to cover outputs and fees"),
+                &Error::CoinError(err) => write!(f, "Error on coin operations: {}", err)
+            }
+        }
     }
 
     type Result<T> = result::Result<T, Error>;

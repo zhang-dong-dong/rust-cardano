@@ -13,18 +13,23 @@ use config;
 use bip44::{Addressing, AddrType, BIP44_PURPOSE, BIP44_COIN_TYPE};
 use tx::fee::Algorithm;
 
-use std::{result};
+use std::{result, fmt};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Error {
-    NotMyAddress_NoPayload,
-    NotMyAddress_CannotDecodePayload,
-    NotMyAddress_NotMyPublicKey,
-    NotMyAddress_InvalidAddressing,
     FeeCalculationError(tx::fee::Error)
 }
 impl From<tx::fee::Error> for Error {
     fn from(j: tx::fee::Error) -> Self { Error::FeeCalculationError(j) }
+}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Error::FeeCalculationError(err) => {
+                write!(f, "Fee calculation error: {}", err)
+            }
+        }
+    }
 }
 
 pub type Result<T> = result::Result<T, Error>;
