@@ -73,7 +73,7 @@ impl HasCommand for Wallet {
                             .and_then(|s| Some(s.to_string()))
                             .unwrap();
                         let mut packref = [0u8;32];
-                        packref.clone_from_slice(&decode(&packrefhex)[..]);
+                        packref.clone_from_slice(&decode(&packrefhex).unwrap()[..]);
                         let (fanout, refs) = pack::dump_index(&store_config, &packref).unwrap();
                         for r in refs.iter() {
                             println!("{}", encode(r));

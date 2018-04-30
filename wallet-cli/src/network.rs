@@ -57,7 +57,7 @@ impl HasCommand for Network {
             },
             ("get-block", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
-                let hh_bytes = hex::decode(&hh_hex);
+                let hh_bytes = hex::decode(&hh_hex).unwrap();
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let mut net = Network::new(&config);
                 let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)

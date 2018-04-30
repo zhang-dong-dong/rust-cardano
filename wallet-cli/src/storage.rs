@@ -103,7 +103,7 @@ impl StorageConfig {
             if entry.file_type().unwrap().is_file() {
                 if let Ok(s) = entry.file_name().into_string() {
                     if s.len() == 64 {
-                        let v = decode(s.as_ref());
+                        let v = decode(s.as_ref()).unwrap();
                         let mut packref = [0;HASH_SIZE];
                         packref.clone_from_slice(&v[..]);
                         packs.push(packref);
@@ -122,7 +122,7 @@ impl StorageConfig {
             if entry.file_type().unwrap().is_file() {
                 if let Ok(s) = entry.file_name().into_string() {
                     if s.len() == 64 {
-                        let v = decode(s.as_ref());
+                        let v = decode(s.as_ref()).unwrap();
                         let mut blobref = [0;HASH_SIZE];
                         blobref.clone_from_slice(&v[..]);
                         blobs.push(blobref);

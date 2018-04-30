@@ -25,7 +25,7 @@ impl HasCommand for Block {
         match args.subcommand() {
             ("cat", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
-                let hh_bytes = hex::decode(&hh_hex);
+                let hh_bytes = hex::decode(&hh_hex).unwrap();
                 let hh = protocol::packet::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
                 let storage = Storage::init(&store_config).unwrap();
