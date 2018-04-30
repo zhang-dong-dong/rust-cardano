@@ -55,7 +55,7 @@ impl HasCommand for Block {
                                         println!("{} : {:?}", Green.paint("extra-data    "), hdr.extra_data);
                                         println!("### Body");
                                         println!("{}", Green.paint("tx-payload"));
-                                        for e in body.tx.txaux.iter() {
+                                        for e in body.tx.iter() {
                                             println!("  {}", e);
                                         }
                                         println!("{} : {:?}", Green.paint("scc           "), body.scc);

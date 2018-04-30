@@ -176,12 +176,11 @@ pub mod main {
     use super::*;
     use wallet_crypto::{tx, cbor};
     use std::{fmt};
+    use std::collections::linked_list::{Iter};
 
     #[derive(Debug)]
     pub struct TxPayload {
-        pub txaux: LinkedList<tx::TxAux>
-        // txs: LinkedList<tx::Tx>,
-        // witnesses: LinkedList<Vec<tx::TxInWitness>>
+        txaux: LinkedList<tx::TxAux>
     }
     impl fmt::Display for TxPayload {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -195,16 +194,13 @@ pub mod main {
         }
     }
     impl TxPayload {
-        // pub fn new(txs: LinkedList<tx::Tx>, wts: LinkedList<Vec<tx::TxInWitness>>) -> Self {
-            // TxPayload { txs: txs, witnesses: wts }
         pub fn new(txaux: LinkedList<tx::TxAux>) -> Self {
             TxPayload { txaux: txaux }
-            // TxPayload { txs: txs, witnesses: wts }
         }
         pub fn empty() -> Self {
             TxPayload::new(LinkedList::new())
-            // TxPayload::new(LinkedList::new(), LinkedList::new())
         }
+        pub fn iter(&self) -> Iter<tx::TxAux> { self.txaux.iter() }
     }
     impl cbor::CborValue for TxPayload {
         fn encode(&self) -> cbor::Value {
