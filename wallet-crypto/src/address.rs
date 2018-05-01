@@ -383,7 +383,10 @@ impl<'de> serde::de::Visitor<'de> for XAddrVisitor {
     fn visit_str<'a, E>(self, v: &'a str) -> Result<Self::Value, E>
         where E: serde::de::Error
     {
-        let bytes = base58::decode(v);
+        let bytes = match base58::decode(v) {
+            Err(err) => { return Err(E::custom(format!("invalid base58:{}", err))); },
+            Ok(v) => v
+        };
 
         match cbor::decode_from_cbor(&bytes) {
             Err((val, err)) => { Err(E::custom(format!("{:?}\n{:?}", err, val))) },
@@ -573,7 +576,7 @@ mod tests {
     #[test]
     fn decode_address_1() {
         let addr_str  = "DdzFFzCqrhsyhumccfGyEj3WZzztSPr92ntRWB6UVVwzcMTpwoafVQ5vD9mdZ5Xind8ycugbmA8esxmo7NycjQFGSbDeKrxabTz8MVzf";
-        let bytes     = base58::decode(addr_str);
+        let bytes     = base58::decode(addr_str).unwrap();
 
         let r = ExtendedAddr::from_bytes(&bytes).unwrap();
 
@@ -584,7 +587,7 @@ mod tests {
     #[test]
     fn decode_address_2() {
         let addr_str  = "DdzFFzCqrhsi8XFMabbnHecVusaebqQCkXTqDnCumx5esKB1pk1zbhX5BtdAivZbQePFVujgzNCpBVXactPSmphuHRC5Xk8qmBd49QjW";
-        let bytes     = base58::decode(addr_str);
+        let bytes     = base58::decode(addr_str).unwrap();
 
         let r = ExtendedAddr::from_bytes(&bytes).unwrap();
 
