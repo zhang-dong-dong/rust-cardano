@@ -1,6 +1,6 @@
 use std::collections::{LinkedList};
 use std::{fmt};
-use wallet_crypto::cbor::{Value, ExtendedResult};
+use wallet_crypto::cbor::{ExtendedResult};
 use wallet_crypto::{cbor, util, tx};
 use wallet_crypto::config::{ProtocolMagic};
 use wallet_crypto::hdwallet;
@@ -474,6 +474,7 @@ pub mod main {
                 let (array, chain_difficulty) : (Vec<cbor::Value>, Vec<u64>) = cbor::array_decode_elem(array, 0).embed("chain difficulty")?;
                 let (array, block_signature) = cbor::array_decode_elem(array, 0).embed("block signature")?;
 
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(Consensus {
                     slot_id: slotid,
                     leader_key: leaderkey,

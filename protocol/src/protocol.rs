@@ -8,6 +8,28 @@ use ntt;
 
 use wallet_crypto::cbor;
 
+#[derive(Debug)]
+pub enum Error {
+    NttError(ntt::Error),
+    IOError(io::Error),
+    ByteEncodingError((cbor::Value, cbor::Error)),
+    ServerCreatedLightIdTwice(LightId),
+    UnsupportedControl(ntt::protocol::ControlHeader),
+    NodeIdNotFound(ntt::protocol::NodeId),
+    ClientIdNotFoundFromNodeId(ntt::protocol::NodeId, LightId),
+}
+impl From<(cbor::Value, cbor::Error)> for Error {
+    fn from(e: (cbor::Value, cbor::Error)) -> Self { Error::ByteEncodingError(e) }
+}
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self { Error::IOError(e) }
+}
+impl From<ntt::Error> for Error {
+    fn from(e: ntt::Error) -> Self { Error::NttError(e) }
+}
+
+pub type Result<T> = ::std::result::Result<T, Error>;
+
 /// Light ID create by the server or by the client
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub struct LightId(pub u32);
@@ -47,10 +69,10 @@ impl LightConnection {
             received: None
         }
     }
-    pub fn new_expecting_nodeid(id: LightId, node: &ntt::protocol::NodeId) -> Self {
+    pub fn new_expecting_nodeid(id: LightId, node: ntt::protocol::NodeId) -> Self {
         LightConnection {
             id: id,
-            node_id: node.clone(),
+            node_id: node,
             received: None
         }
     }
@@ -80,7 +102,7 @@ impl LightConnection {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub enum ServerLightConnection {
     Establishing,
     Established(ntt::protocol::NodeId),
@@ -130,13 +152,13 @@ impl<T: Write+Read> Connection<T> {
         }
     }
 
-    pub fn handshake(&mut self, hs: &packet::Handshake) -> io::Result<()> {
+    pub fn handshake(&mut self, hs: &packet::Handshake) -> Result<()> {
         use ntt::protocol::{ControlHeader, Command};
         let lcid = self.find_next_connection_id();
         let lc = LightConnection::new_with_nodeid(lcid, self.ntt.get_nonce());
 
         /* create a connection, then send the handshake data, followed by the node id associated with this connection */
-        self.ntt.create_light(lcid.0);
+        self.ntt.create_light(lcid.0)?;
         self.send_bytes(lcid, &packet::send_handshake(hs));
         self.send_nodeid(lcid, &lc.node_id);
 
@@ -145,16 +167,16 @@ impl<T: Write+Read> Connection<T> {
         /* wait answer from server, which should a new light connection creation,
          * followed by the handshake data and then the node id
          */
-        let siv = match self.ntt.recv().unwrap() {
+        let siv = match self.ntt.recv()? {
             Command::Control(ControlHeader::CreatedNewConnection, cid) => { LightId::new(cid) },
             _ => { unimplemented!() }
         };
 
-        fn data_recv_on<T: Read+Write>(con: &mut Connection<T>, expected_id: LightId) -> io::Result<Vec<u8>> {
-            match con.ntt.recv().unwrap() {
+        fn data_recv_on<T: Read+Write>(con: &mut Connection<T>, expected_id: LightId) -> Result<Vec<u8>> {
+            match con.ntt.recv()? {
                 ntt::protocol::Command::Data(cid, len) => {
                     if cid == expected_id.0 {
-                        let bytes = con.ntt.recv_len(len).unwrap();
+                        let bytes = con.ntt.recv_len(len)?;
                         Ok(bytes)
                     } else {
                         unimplemented!()
@@ -165,7 +187,7 @@ impl<T: Write+Read> Connection<T> {
         };
 
         let server_bytes_hs = data_recv_on(self, siv)?;
-        let _server_handshake : Handshake = cbor::decode_from_cbor(&server_bytes_hs).unwrap();
+        let _server_handshake : Handshake = cbor::decode_from_cbor(&server_bytes_hs)?;
 
         let server_bytes_nodeid = data_recv_on(self, siv)?;
         let server_nodeid = match ntt::protocol::NodeId::from_slice(&server_bytes_nodeid[..]) {
@@ -175,18 +197,19 @@ impl<T: Write+Read> Connection<T> {
 
         // TODO compare server_nodeid and client_id
 
-        let scon = LightConnection::new_expecting_nodeid(siv, &server_nodeid);
+        let _scon = LightConnection::new_expecting_nodeid(siv, server_nodeid);
         self.server_cons.insert(siv, ServerLightConnection::Established(server_nodeid));
 
         Ok(())
     }
 
-    pub fn new_light_connection(&mut self, id: LightId) {
-        self.ntt.create_light(id.0).unwrap();
+    pub fn new_light_connection(&mut self, id: LightId) -> Result<()> {
+        self.ntt.create_light(id.0)?;
 
         let lc = LightConnection::new_with_nodeid(id, self.ntt.get_nonce());
         self.send_nodeid(id, &lc.node_id);
         self.client_cons.insert(id, lc);
+        Ok(())
     }
 
     pub fn close_light_connection(&mut self, id: LightId) {
@@ -207,9 +230,9 @@ impl<T: Write+Read> Connection<T> {
         }
     }
 
-    pub fn wait_msg(&mut self, id: LightId) -> io::Result<Vec<u8>> {
+    pub fn wait_msg(&mut self, id: LightId) -> Result<Vec<u8>> {
         while !self.has_bytes_to_read(id) {
-            self.broadcast()
+            self.broadcast()?;
         }
 
         match self.client_cons.get(&id) {
@@ -223,57 +246,66 @@ impl<T: Write+Read> Connection<T> {
         }
     }
 
-    pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
-        self.ntt.light_send_data(id.0, bytes).unwrap()
+    pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) -> Result<()> {
+        self.ntt.light_send_data(id.0, bytes)?;
+        Ok(())
     }
 
-    pub fn send_nodeid(&mut self, id: LightId, nodeid: &ntt::protocol::NodeId) {
-        self.ntt.light_send_data(id.0, nodeid.as_ref()).unwrap()
+    pub fn send_nodeid(&mut self, id: LightId, nodeid: &ntt::protocol::NodeId) -> Result<()> {
+        self.ntt.light_send_data(id.0, nodeid.as_ref())?;
+        Ok(())
     }
 
     // TODO return some kind of opaque token
-    pub fn send_bytes_ack(&mut self, id: LightId, bytes: &[u8]) -> ntt::protocol::NodeId {
+    pub fn send_bytes_ack(&mut self, id: LightId, bytes: &[u8]) -> Result<ntt::protocol::NodeId> {
         match self.client_cons.get(&id) {
             None => panic!("send bytes ack ERROR. connection doesn't exist"),
             Some(con) => {
-                self.ntt.light_send_data(id.0, bytes).unwrap();
-                con.node_id.clone()
+                self.ntt.light_send_data(id.0, bytes)?;
+                Ok(con.node_id)
             }
         }
     }
 
-    pub fn broadcast(&mut self) {
+    pub fn broadcast(&mut self) -> Result<()> {
         use ntt::protocol::{ControlHeader, Command};
-        match self.ntt.recv().unwrap() {
+        match self.ntt.recv()? {
             Command::Control(ControlHeader::CloseConnection, cid) => {
                 let id = LightId::new(cid);
                 match self.server_cons.remove(&id) {
-                    Some(ServerLightConnection::Establishing) => {},
+                    Some(ServerLightConnection::Establishing) => {
+                        Ok(())
+                    },
                     Some(ServerLightConnection::Established(v)) => {
                         /*
                         if let Some(_) = v.received {
                             self.server_dones.insert(id, v);
                         }
                         */
+                        Ok(())
                     },
-                    Some(v) => {
-                    },
-                    None    =>
+                    None    => {
                         // BUG, server asked to close connection but connection doesn't exists in tree
-                        {},
+                        // TODO, we might wanto to warn about this, but this is not an error.
+                        Ok(())
+                    },
                 }
             },
             Command::Control(ControlHeader::CreatedNewConnection, cid) => {
                 let id = LightId::new(cid);
                 if let Some(_) = self.server_cons.get(&id) {
-                    panic!("light id created twice")
+                    // TODO report this as an error to the logger
+                    eprintln!("light id created twice");
+                    Err(Error::ServerCreatedLightIdTwice(id))
                 } else {
                     //let con = LightConnection::new_expecting_nodeid(id);
                     self.server_cons.insert(id, ServerLightConnection::Establishing);
+                    Ok(())
                 }
             },
             Command::Control(ch, cid) => {
-                println!("{}:{}: LightId({}) Unsupported control `{:?}`", file!(), line!(), cid, ch);
+                eprintln!("{}:{}: LightId({}) Unsupported control `{:?}`", file!(), line!(), cid, ch);
+                Err(Error::UnsupportedControl(ch))
             },
             ntt::protocol::Command::Data(server_id, len) => {
                 let id = LightId::new(server_id);
@@ -286,13 +318,14 @@ impl<T: Write+Read> Connection<T> {
                         match slc {
                             ServerLightConnection::Established(nodeid) => {
                                 match self.map_to_client.get(&nodeid) {
-                                    None => println!("ERROR bug cannot find node in client map"),
+                                    None => Err(Error::NodeIdNotFound(nodeid)),
                                     Some(client_id) => {
                                         match self.client_cons.get_mut(client_id) {
-                                            None => println!("ERROR bug cannot find client connection for receiving"),
+                                            None => Err(Error::ClientIdNotFoundFromNodeId(nodeid, *client_id)),
                                             Some(con) => {
                                                 let bytes = self.ntt.recv_len(len).unwrap();
                                                 con.receive(&bytes);
+                                                Ok(())
                                             }
                                         }
                                     },
@@ -310,16 +343,18 @@ impl<T: Write+Read> Connection<T> {
                                 self.server_cons.insert(id, ServerLightConnection::Established(nodeid.clone()));
 
                                 match self.client_cons.iter().find(|(k,v)| v.node_id.match_ack(&nodeid)) {
-                                    None        => {},
+                                    None        => { Ok(()) },
                                     Some((z,_)) => {
                                         self.map_to_client.insert(nodeid, *z);
+                                        Ok(())
                                     }
                                 }
                             },
                         }
                     },
                     None => {
-                        println!("{}:{}: LightId({}) does not exists but received data", file!(), line!(), server_id)
+                        println!("{}:{}: LightId({}) does not exists but received data", file!(), line!(), server_id);
+                        Ok(())
                     },
                 }
             },
@@ -367,7 +402,7 @@ pub mod command {
             connection.send_bytes(id, &[get_header_id]);
             connection.send_bytes(id, &get_header_dat[..]);
             let dat = connection.wait_msg(id).unwrap();
-            let mut l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+            let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
             println!("{}", l);
     
             match l {

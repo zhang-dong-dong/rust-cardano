@@ -175,7 +175,7 @@ pub mod protocol {
         Ack,
     }
 
-    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
     pub struct NodeId([u8;9]);
 
     const NODEID_SYN : u8 = 0x53; // 'S'
