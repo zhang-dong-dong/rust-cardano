@@ -168,6 +168,9 @@ pub mod protocol {
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
     pub struct NodeId([u8;9]);
 
+    const NODEID_SYN : u8 = 0x53; // 'S'
+    const NODEID_ACK : u8 = 0x41; // 'A'
+
     impl AsRef<[u8]> for NodeId {
         fn as_ref(&self) -> &[u8] { &self.0 }
     }
@@ -176,8 +179,8 @@ pub mod protocol {
     fn make_nodeid(header: NodeControlHeader, nonce: Nonce) -> NodeId {
         let mut v = [0;9];
         v[0] = match header {
-                    NodeControlHeader::Syn => 0x53, // 'S'
-                    NodeControlHeader::Ack => 0x41  // 'A'
+                    NodeControlHeader::Syn => NODEID_SYN,
+                    NodeControlHeader::Ack => NODEID_ACK,
         };
         v[1] = (nonce >> 56) as u8;
         v[2] = (nonce >> 48) as u8;
@@ -191,6 +194,14 @@ pub mod protocol {
     }
 
     impl NodeId {
+        pub fn from_slice(slice: &[u8]) -> Option<Self> {
+            if slice[0] != NODEID_SYN && slice[0] != NODEID_ACK { return None }
+            if slice.len() != 9 { return None }
+            let mut buf = [0u8;9];
+            buf.clone_from_slice(slice);
+            Some(NodeId(buf))
+        }
+
         pub fn make_syn(nonce: Nonce) -> Self {
             make_nodeid(NodeControlHeader::Syn, nonce)
         }
@@ -199,7 +210,21 @@ pub mod protocol {
             make_nodeid(NodeControlHeader::Ack, nonce)
         }
         pub fn get_control_header(&self) -> NodeControlHeader {
-            if self.0[0] == 0x53 { NodeControlHeader::Syn } else { NodeControlHeader::Ack }
+            if self.0[0] == NODEID_ACK { NodeControlHeader::Syn } else { NodeControlHeader::Ack }
+        }
+
+        // check if a SYN nodeid match a specific ACK nodeid
+        pub fn match_ack(&self, ack_nodeid: NodeId) -> bool {
+            assert!(self.0[0] == NODEID_SYN);
+            ack_nodeid.0[0] == NODEID_ACK && self.0[1..9] == ack_nodeid.0[1..9]
+        }
+
+        // Given a ACK nodeid, get the equivalent SYN nodeid
+        pub fn ack_to_syn(&self) -> Self {
+            assert!(self.0[0] == NODEID_ACK);
+            let mut nodeid = self.clone();
+            nodeid.0[0] == NODEID_SYN;
+            nodeid
         }
     }
 
