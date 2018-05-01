@@ -52,8 +52,8 @@ fn main() {
     // example below works on mainnet only:
     // let prev_block_id = packet::HeaderHash::from_bytes([0x42, 0x88, 0xff, 0xec, 0x11, 0x22, 0x10, 0x6d, 0xf4, 0x4c, 0xcf, 0x12, 0xfc, 0xfb, 0xde, 0x44, 0xdb, 0xe0, 0x7d, 0x24, 0x5d, 0xba, 0x06, 0x23, 0xba, 0xb8, 0xb8, 0x63, 0xa7, 0x04, 0x85, 0x64]);
     {
-        let dat = command::GetBlock::only(prev_blk_id)
-            .execute(&mut connection).expect("to get a block");
+        let getter = command::GetBlock::only(prev_blk_id);
+        let dat = getter.get_block(connection, id)(&mut connection).expect("to get a block");
         let l : packet::BlockResponse = wallet_crypto::cbor::decode_from_cbor(&dat).unwrap();
         match l {
             packet::BlockResponse::Ok(blk) => {

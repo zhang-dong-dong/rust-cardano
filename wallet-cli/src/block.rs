@@ -2,7 +2,7 @@ use wallet_crypto::util::{hex};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, StorageConfig, blob, block_location, block_read_location};
+use storage::{Storage, StorageConfig, blob, block_location, block_read_location,pack_blobs, pack, PackParameters};
 use wallet_crypto::cbor;
 
 use ansi_term::Colour::*;
@@ -25,6 +25,40 @@ impl HasCommand for Block {
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         match args.subcommand() {
+            ("debug-index", opts) => {
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let storage = Storage::init(&store_config).unwrap();
+                match opts {
+                    None    => {
+                        let vs = store_config.list_indexes();
+                        for &v in vs.iter() {
+                            println!("{}", hex::encode(&v));
+                        }
+                    },
+                    Some(opts) => {
+                        let packrefhex = opts.value_of("packhash")
+                            .and_then(|s| Some(s.to_string()))
+                            .unwrap();
+                        let mut packref = [0u8;32];
+                        packref.clone_from_slice(&hex::decode(&packrefhex).unwrap()[..]);
+                        let (fanout, refs) = pack::dump_index(&store_config, &packref).unwrap();
+                        for r in refs.iter() {
+                            println!("{}", hex::encode(r));
+                        }
+                    }
+                }
+            },
+            ("pack", _) => {
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let mut storage = Storage::init(&store_config).unwrap();
+                let pack_params = PackParameters {
+                    limit_nb_blobs: None,
+                    limit_size: None,
+                    delete_blobs_after_pack: false,
+                };
+                let packhash = pack_blobs(&mut storage, &pack_params);
+                println!("pack created: {}", hex::encode(&packhash));
+            },
             ("cat", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
                 let hh_bytes = hex::decode(&hh_hex).unwrap();

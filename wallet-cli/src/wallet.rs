@@ -58,42 +58,6 @@ impl HasCommand for Wallet {
                 let storage = Storage::init(&store_config).unwrap();
                 Some(cfg) // we need to update the config's wallet
             },
-            ("debug-index", opts) => {
-                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
-                let storage = Storage::init(&store_config).unwrap();
-                match opts {
-                    None    => {
-                        let vs = store_config.list_indexes();
-                        for &v in vs.iter() {
-                            println!("{}", encode(&v));
-                        }
-                    },
-                    Some(opts) => {
-                        let packrefhex = opts.value_of("packhash")
-                            .and_then(|s| Some(s.to_string()))
-                            .unwrap();
-                        let mut packref = [0u8;32];
-                        packref.clone_from_slice(&decode(&packrefhex).unwrap()[..]);
-                        let (fanout, refs) = pack::dump_index(&store_config, &packref).unwrap();
-                        for r in refs.iter() {
-                            println!("{}", encode(r));
-                        }
-                    }
-                }
-                Some(cfg)
-            },
-            ("pack", _) => {
-                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
-                let mut storage = Storage::init(&store_config).unwrap();
-                let pack_params = PackParameters {
-                    limit_nb_blobs: None,
-                    limit_size: None,
-                    delete_blobs_after_pack: false,
-                };
-                let packhash = pack_blobs(&mut storage, &pack_params);
-                println!("pack created: {}", encode(&packhash));
-                Some(cfg)
-            }
             ("address", Some(opts)) => {
                 // expect existing wallet
                 assert!(cfg.wallet.is_some());
