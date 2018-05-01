@@ -460,10 +460,10 @@ pub mod main {
 
     #[derive(Debug)]
     pub struct Consensus {
-        slot_id: SlotId,
-        leader_key: hdwallet::XPub,
-        chain_difficulty: ChainDifficulty,
-        block_signature: BlockSignature,
+        pub slot_id: SlotId,
+        pub leader_key: hdwallet::XPub,
+        pub chain_difficulty: ChainDifficulty,
+        pub block_signature: BlockSignature,
     }
     impl cbor::CborValue for Consensus {
         fn encode(&self) -> cbor::Value {
