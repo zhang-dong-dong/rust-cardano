@@ -23,7 +23,9 @@ impl Network {
         stream.set_nodelay(true).unwrap();
 
         let conn = protocol::ntt::Connection::handshake(drg_seed, stream).unwrap();
-        Network(protocol::Connection::new(conn, &hs))
+        let mut conne = protocol::Connection::new(conn);
+        conne.handshake(&hs).unwrap();
+        Network(conne)
     }
 }
 
