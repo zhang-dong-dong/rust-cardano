@@ -474,6 +474,7 @@ pub mod main {
                 let (array, chain_difficulty) : (Vec<cbor::Value>, Vec<u64>) = cbor::array_decode_elem(array, 0).embed("chain difficulty")?;
                 let (array, block_signature) = cbor::array_decode_elem(array, 0).embed("block signature")?;
 
+                if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(Consensus {
                     slot_id: slotid,
                     leader_key: leaderkey,
