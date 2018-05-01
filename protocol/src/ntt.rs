@@ -62,31 +62,31 @@ impl<W: Sized+Write+Read> Connection<W> {
         v
     }
 
-    pub fn create_light(&mut self, cid: LightweightConnectionId) {
+    pub fn create_light(&mut self, cid: LightweightConnectionId) -> Result<()> {
         assert!(cid >= LIGHT_ID_MIN);
         let mut buf = vec![];
         protocol::create_conn(cid, &mut buf);
-        self.emit("create-connection", &buf);
+        self.emit("create-connection", &buf)
     }
 
-    pub fn close_light(&mut self, cid: LightweightConnectionId) {
+    pub fn close_light(&mut self, cid: LightweightConnectionId) -> Result<()> {
         assert!(cid >= LIGHT_ID_MIN);
         let mut buf = vec![];
         protocol::delete_conn(cid, &mut buf);
-        self.emit("close-connection", &buf);
+        self.emit("close-connection", &buf)
     }
 
-    pub fn send_endpoint(&mut self, endpoint: &EndPoint) {
+    pub fn send_endpoint(&mut self, endpoint: &EndPoint) -> Result<()> {
         let mut buf = vec![];
         protocol::append_with_length(endpoint.as_ref(), &mut buf);
-        self.emit("send endpoint", &buf);
+        self.emit("send endpoint", &buf)
     }
 
-    pub fn light_send_data(&mut self, lwc: LightweightConnectionId, dat: &[u8]) {
+    pub fn light_send_data(&mut self, lwc: LightweightConnectionId, dat: &[u8]) -> Result<()> {
         let mut buf = vec![];
         protocol::append_lightweight_data(lwc, dat.len() as u32, &mut buf);
-        self.emit("send lightcon data header", &buf);
-        self.emit("send lightcon data",  &dat);
+        self.emit("send lightcon data header", &buf)?;
+        self.emit("send lightcon data",  &dat)
     }
 
     // emit utility
@@ -232,7 +232,7 @@ pub mod protocol {
         // Given a ACK nodeid, get the equivalent SYN nodeid
         pub fn ack_to_syn(&self) -> Self {
             assert!(self.0[0] == NODEID_ACK);
-            let mut nodeid = self.clone();
+            let nodeid = self.clone();
             nodeid.0[0] == NODEID_SYN;
             nodeid
         }

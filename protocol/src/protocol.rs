@@ -121,7 +121,7 @@ impl<T: Write+Read> Connection<T> {
 
         let lcid = conn.find_next_connection_id();
         let lc = LightConnection::new_with_nodeid(lcid, conn.ntt.get_nonce());
-        conn.ntt.create_light(lcid.0);
+        conn.ntt.create_light(lcid.0).unwrap();
         conn.client_cons.insert(lcid, lc);
 
         // we are expecting the first broadcast to respond a connection ack
@@ -148,7 +148,7 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn new_light_connection(&mut self, id: LightId) {
-        self.ntt.create_light(id.0);
+        self.ntt.create_light(id.0).unwrap();
 
         let lc = LightConnection::new_with_nodeid(id, self.ntt.get_nonce());
         self.client_cons.insert(id, lc);
@@ -179,7 +179,7 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
-        self.ntt.light_send_data(id.0, bytes)
+        self.ntt.light_send_data(id.0, bytes).unwrap()
     }
 
     // TODO return some kind of opaque token
@@ -190,7 +190,7 @@ impl<T: Write+Read> Connection<T> {
                 match con.node_id.clone() {
                     None      => panic!("connection without node id asking for ack. internal bug"),
                     Some(nid) => {
-                        self.ntt.light_send_data(id.0, bytes);
+                        self.ntt.light_send_data(id.0, bytes).unwrap();
                         nid
                     }
                 }
