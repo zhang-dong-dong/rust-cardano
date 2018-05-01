@@ -162,7 +162,9 @@ impl TmpFile {
         // to represent the same file, some error like EEXIST can be ignored, but some should be raised.
         // NOTE2: also we consider that the rename is atomic for the tmpfile abstraction to work correctly,
         // but it mostly depends on the actual filesystem. for most case it should be atomic.
-        fs::rename(&self.path, path);
+        match fs::rename(&self.path, path) {
+            _ => {},
+        };
         Ok(())
     }
 }
@@ -190,7 +192,7 @@ pub mod tag {
     pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
         let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
         tmp_file.file.write_all(hex::encode(content).as_bytes()).unwrap();
-        tmp_file.render_permanent(&storage.config.get_tag_filepath(name));
+        tmp_file.render_permanent(&storage.config.get_tag_filepath(name)).unwrap();
     }
 
     pub fn read(storage: &super::Storage, name: &str) -> Option<Vec<u8>> {
@@ -220,7 +222,7 @@ pub mod blob {
 
         // finalize
         let path = storage.config.get_blob_filepath(&hash);
-        tmp_file.render_permanent(&path);
+        tmp_file.render_permanent(&path).unwrap();
     }
 
     pub fn read(storage: &super::Storage, hash: &super::BlockHash) -> Vec<u8> {
@@ -517,7 +519,7 @@ pub mod pack {
         let FanoutNb(total) = fanout.get_total();
 
         file.seek(SeekFrom::Start(HEADER_SIZE as u64)).unwrap();
-        for i in 0..total {
+        for _ in 0..total {
             let h = file_read_hash(&mut file);
             v.push(h);
         }

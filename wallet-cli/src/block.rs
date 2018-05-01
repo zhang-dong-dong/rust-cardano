@@ -2,13 +2,13 @@ use wallet_crypto::util::{hex};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, StorageConfig, blob, block_location, block_read_location,pack_blobs, pack, PackParameters};
+use storage::{Storage, StorageConfig, block_location, block_read_location,pack_blobs, pack, PackParameters};
 use wallet_crypto::cbor;
 
 use ansi_term::Colour::*;
 
 use protocol;
-use protocol::{packet};
+//use protocol::{packet};
 
 pub struct Block;
 
