@@ -223,16 +223,6 @@ impl<T: Write+Read> Connection<T> {
         }
     }
 
-    /// get a mutable reference to a LightConnection so one can read its received data
-    ///
-    //pub fn poll<'a>(&'a mut self) -> Option<&'a mut LightConnection> {
-    //    self.server_cons.iter_mut().find(|t| t.1.pending_received()).map(|t| t.1)
-    //}
-
-    //pub fn poll_id<'a>(&'a mut self, id: LightId) -> Option<&'a mut LightConnection> {
-    //    self.server_cons.iter_mut().find(|t| t.0 == &id && t.1.pending_received()).map(|t| t.1)
-    //}
-
     pub fn send_bytes(&mut self, id: LightId, bytes: &[u8]) {
         self.ntt.light_send_data(id.0, bytes).unwrap()
     }
@@ -320,7 +310,7 @@ impl<T: Write+Read> Connection<T> {
                                 self.server_cons.insert(id, ServerLightConnection::Established(nodeid.clone()));
 
                                 match self.client_cons.iter().find(|(k,v)| v.node_id.match_ack(&nodeid)) {
-                                    None => {},
+                                    None        => {},
                                     Some((z,_)) => {
                                         self.map_to_client.insert(nodeid, *z);
                                     }
