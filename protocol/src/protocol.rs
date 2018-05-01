@@ -159,8 +159,8 @@ impl<T: Write+Read> Connection<T> {
 
         /* create a connection, then send the handshake data, followed by the node id associated with this connection */
         self.ntt.create_light(lcid.0)?;
-        self.send_bytes(lcid, &packet::send_handshake(hs));
-        self.send_nodeid(lcid, &lc.node_id);
+        self.send_bytes(lcid, &packet::send_handshake(hs))?;
+        self.send_nodeid(lcid, &lc.node_id)?;
 
         self.client_cons.insert(lcid, lc);
 
@@ -207,7 +207,7 @@ impl<T: Write+Read> Connection<T> {
         self.ntt.create_light(id.0)?;
 
         let lc = LightConnection::new_with_nodeid(id, self.ntt.get_nonce());
-        self.send_nodeid(id, &lc.node_id);
+        self.send_nodeid(id, &lc.node_id)?;
         self.client_cons.insert(id, lc);
         Ok(())
     }
@@ -376,8 +376,8 @@ pub mod command {
         fn execute(&self, connection: &mut Connection<W>) -> Result<Self::Output, &'static str> {
             let id = connection.get_free_light_id();
 
-            connection.new_light_connection(id);
-            connection.broadcast(); // expect ack of connection creation
+            connection.new_light_connection(id).unwrap();
+            connection.broadcast().unwrap(); // expect ack of connection creation
 
             let ret = self.cmd(connection, id)?;
 
@@ -399,8 +399,8 @@ pub mod command {
         fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
             // require the initial header
             let (get_header_id, get_header_dat) = packet::send_msg_getheaders(&[], &self.0);
-            connection.send_bytes(id, &[get_header_id]);
-            connection.send_bytes(id, &get_header_dat[..]);
+            connection.send_bytes(id, &[get_header_id]).unwrap();
+            connection.send_bytes(id, &get_header_dat[..]).unwrap();
             let dat = connection.wait_msg(id).unwrap();
             let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
             println!("{}", l);
@@ -431,8 +431,8 @@ pub mod command {
         fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
             // require the initial header
             let (get_header_id, get_header_dat) = packet::send_msg_getblocks(&self.from, &self.to);
-            connection.send_bytes(id, &[get_header_id]);
-            connection.send_bytes(id, &get_header_dat[..]);
+            connection.send_bytes(id, &[get_header_id]).unwrap();
+            connection.send_bytes(id, &get_header_dat[..]).unwrap();
             Ok(connection.wait_msg(id).unwrap())
         }
     }
