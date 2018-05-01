@@ -287,9 +287,13 @@ impl<T: Write+Read> Connection<T> {
             },
             ntt::protocol::Command::Data(server_id, len) => {
                 let id = LightId::new(server_id);
-                match self.server_cons.get(&id) {
+                let v = match self.server_cons.get(&id) {
+                    None      => None,
+                    Some(slc) => Some(slc.clone())
+                };
+                match v {
                     Some(slc) => {
-                        match slc.clone() {
+                        match slc {
                             ServerLightConnection::Established(nodeid) => {
                                 match self.map_to_client.get(&nodeid) {
                                     None => println!("ERROR bug cannot find node in client map"),
@@ -311,11 +315,11 @@ impl<T: Write+Read> Connection<T> {
                                     Some(nodeid) => nodeid,
                                 };
 
-                                let scon = LightConnection::new_expecting_nodeid(id, &nodeid);
+                                //let scon = LightConnection::new_expecting_nodeid(id, &nodeid);
                                 self.server_cons.remove(&id);
-                                self.server_cons.insert(id, ServerLightConnection::Established(nodeid));
+                                self.server_cons.insert(id, ServerLightConnection::Established(nodeid.clone()));
 
-                                match self.client_cons.iter().find(|(k,v)| v.node_id.match_ack(nodeid)) {
+                                match self.client_cons.iter().find(|(k,v)| v.node_id.match_ack(&nodeid)) {
                                     None => {},
                                     Some((z,_)) => {
                                         self.map_to_client.insert(nodeid, *z);

@@ -224,7 +224,7 @@ pub mod protocol {
         }
 
         // check if a SYN nodeid match a specific ACK nodeid
-        pub fn match_ack(&self, ack_nodeid: NodeId) -> bool {
+        pub fn match_ack(&self, ack_nodeid: &NodeId) -> bool {
             assert!(self.0[0] == NODEID_SYN);
             ack_nodeid.0[0] == NODEID_ACK && self.0[1..9] == ack_nodeid.0[1..9]
         }
