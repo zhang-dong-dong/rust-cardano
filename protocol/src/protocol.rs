@@ -136,7 +136,7 @@ impl<T: Write+Read> Connection<T> {
         let lc = LightConnection::new_with_nodeid(lcid, self.ntt.get_nonce());
 
         /* create a connection, then send the handshake data, followed by the node id associated with this connection */
-        self.ntt.create_light(lcid.0);
+        self.ntt.create_light(lcid.0).unwrap();
         self.send_bytes(lcid, &packet::send_handshake(hs));
         self.send_nodeid(lcid, &lc.node_id);
 
@@ -367,7 +367,7 @@ pub mod command {
             connection.send_bytes(id, &[get_header_id]);
             connection.send_bytes(id, &get_header_dat[..]);
             let dat = connection.wait_msg(id).unwrap();
-            let mut l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
+            let l : packet::BlockHeaderResponse = cbor::decode_from_cbor(&dat).unwrap();
             println!("{}", l);
     
             match l {
