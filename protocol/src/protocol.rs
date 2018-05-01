@@ -164,7 +164,8 @@ impl<T: Write+Read> Connection<T> {
 
     pub fn close_light_connection(&mut self, id: LightId) {
         self.client_cons.remove(&id);
-        self.ntt.close_light(id.0);
+        // TODO: this signal needs to be sent:
+        // self.ntt.close_light(id.0);
     }
 
     /// get a mutable reference to a LightConnection so one can read its received data
