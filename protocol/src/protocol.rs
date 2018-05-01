@@ -412,7 +412,6 @@ pub mod command {
                         None => panic!("pop front")
                     }
                 },
-                _  => Err("No first main block header")
             }
         }
     }
