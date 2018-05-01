@@ -1,6 +1,6 @@
 use std::collections::{LinkedList};
 use std::{fmt};
-use wallet_crypto::cbor::{Value, ExtendedResult};
+use wallet_crypto::cbor::{ExtendedResult};
 use wallet_crypto::{cbor, util, tx};
 use wallet_crypto::config::{ProtocolMagic};
 use wallet_crypto::hdwallet;
