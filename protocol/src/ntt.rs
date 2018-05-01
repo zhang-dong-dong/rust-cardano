@@ -1,6 +1,5 @@
-use std::io::Read;
-use std::io::Write;
-use std::iter;
+use std::io::{Write, Read};
+use std::{iter, io, result};
 
 pub type LightweightConnectionId = u32;
 
@@ -17,6 +16,21 @@ impl EndPoint {
     }
 }
 
+#[derive(Debug)]
+pub enum Error {
+    IOError(io::Error),
+    UnsupportedVersion,
+    InvalidRequest,
+    CrossedRequest,
+    UnknownErrorCode(u32),
+    CommandFailed // TODO add command error in this sum type
+}
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self { Error::IOError(e) }
+}
+
+type Result<T> = result::Result<T, Error>;
+
 pub struct Connection<W: Sized> {
     stream: W,
     drg: u64,
@@ -28,18 +42,17 @@ impl<W: Sized+Write+Read> Connection<W> {
         self.debug = true
     }
 
-    pub fn handshake(drg_seed: u64, stream: W) -> Result<Self,&'static str> {
+    pub fn handshake(drg_seed: u64, stream: W) -> Result<Self> {
         let mut conn = Connection { stream: stream, drg: drg_seed, debug: false };
         let mut buf = vec![];
         protocol::handshake(&mut buf);
-        conn.emit("handshake", &buf);
-        match conn.recv_u32() {
-            Ok(0xffffffff) => Err("unsupported version"),
-            Ok(0x00000001) => Err("request invalid"),
-            Ok(0x00000002) => Err("request crossed"),
-            Ok(0x00000000) => { println!("HANDSHAKE OK"); Ok(conn) },
-            Ok(_)          => Err("unknown code"),
-            Err(_)         => Err("random io error"),
+        conn.emit("handshake", &buf)?;
+        match conn.recv_u32()? {
+            0xffffffff => Err(Error::UnsupportedVersion),
+            0x00000001 => Err(Error::InvalidRequest),
+            0x00000002 => Err(Error::CrossedRequest),
+            0x00000000 => { println!("HANDSHAKE OK"); Ok(conn) },
+            v          => Err(Error::UnknownErrorCode(v)),
         }
     }
 
@@ -77,65 +90,62 @@ impl<W: Sized+Write+Read> Connection<W> {
     }
 
     // emit utility
-    fn emit(&mut self, step: &str, dat: &[u8]) {
+    fn emit(&mut self, step: &str, dat: &[u8]) -> Result<()> {
         if self.debug {
             println!("NTT: {} {:?}", step, dat);
         }
-        self.stream.write_all(dat).unwrap();
+        self.stream.write_all(dat)?;
+        Ok(())
     }
 
     // TODO some kind of error
-    fn recv_u32(&mut self) -> Result<u32, &str> {
+    fn recv_u32(&mut self) -> Result<u32> {
         let mut buf = [0u8; 4];
-        match self.stream.read_exact(&mut buf) {
-            Ok(_) => {
-                let v = ((buf[0] as u32) << 24) |
-                        ((buf[1] as u32) << 16) |
-                        ((buf[2] as u32) << 8) |
-                        (buf[3] as u32);
-                Ok(v)
-            },
-            Err(_) => Err("recvword32: io error"),
-        }
+        self.stream.read_exact(&mut buf)?;
+        let v = ((buf[0] as u32) << 24) |
+                ((buf[1] as u32) << 16) |
+                ((buf[2] as u32) << 8) |
+                (buf[3] as u32);
+        Ok(v)
     }
 
-    pub fn recv(&mut self) -> Result<protocol::Command, &str>  {
-        let hdr = self.recv_u32().unwrap();
+    pub fn recv(&mut self) -> Result<protocol::Command>  {
+        let hdr = self.recv_u32()?;
         if hdr < LIGHT_ID_MIN {
             match protocol::control_header_from_u32(hdr) {
                 Ok(c)  => {
-                    let r = self.recv_u32().unwrap();
+                    let r = self.recv_u32()?;
                     Ok(protocol::Command::Control(c, r))
                 },
-                Err(_) => Err("recv command failed")
+                Err(_) => Err(Error::CommandFailed)
             }
 
         } else {
-            let len = self.recv_u32().unwrap();
+            let len = self.recv_u32()?;
             Ok(protocol::Command::Data(hdr, len))
         }
     }
 
-    pub fn recv_cmd(&mut self) -> Result<(), &str> {
-        let lwc = self.recv_u32().unwrap();
+    pub fn recv_cmd(&mut self) -> Result<()> {
+        let lwc = self.recv_u32()?;
         assert!(lwc < 0x400);
-        let len = self.recv_u32().unwrap();
+        let len = self.recv_u32()?;
         println!("received lwc {} and len {}", lwc, len);
         Ok(())
     }
 
-    pub fn recv_data(&mut self) -> Result<(LightweightConnectionId, Vec<u8>), &str> {
-        let lwc = self.recv_u32().unwrap();
+    pub fn recv_data(&mut self) -> Result<(LightweightConnectionId, Vec<u8>)> {
+        let lwc = self.recv_u32()?;
         println!("received lwc {}", lwc);
-        let len = self.recv_u32().unwrap();
+        let len = self.recv_u32()?;
         let mut buf : Vec<u8> = iter::repeat(0).take(len as usize).collect();
-        self.stream.read_exact(&mut buf[..]).unwrap();
+        self.stream.read_exact(&mut buf[..])?;
         Ok((lwc,buf))
     }
 
-    pub fn recv_len(&mut self, len: u32) -> Result<Vec<u8>, &str> {
+    pub fn recv_len(&mut self, len: u32) -> Result<Vec<u8>> {
         let mut buf : Vec<u8> = iter::repeat(0).take(len as usize).collect();
-        self.stream.read_exact(&mut buf[..]).unwrap();
+        self.stream.read_exact(&mut buf[..])?;
         Ok(buf)
     }
 }
