@@ -236,6 +236,14 @@ pub mod protocol {
             nodeid.0[0] == NODEID_SYN;
             nodeid
         }
+
+        // Given a SYN nodeid, get the equivalent ACK nodeid
+        pub fn syn_to_ack(&self) -> Self {
+            assert!(self.0[0] == NODEID_SYN);
+            let mut nodeid = self.clone();
+            nodeid.0[0] == NODEID_ACK;
+            nodeid
+        }
     }
 
     pub fn handshake(buf: &mut Vec<u8>) {

@@ -174,12 +174,6 @@ pub fn send_handshake(hs: &Handshake) -> Vec<u8> {
     cbor::encode_to_cbor(hs).unwrap()
 }
 
-pub fn send_hardcoded_blob_after_handshake() -> Vec<u8> {
-    vec![
-        0x53, 0x78, 0x29, 0x6e, 0xc5, 0xd4, 0x5c, 0x95, 0x24
-    ]
-}
-
 // Message Header follow by the data
 type Message = (u8, Vec<u8>);
 
