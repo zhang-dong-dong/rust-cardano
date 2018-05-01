@@ -77,15 +77,21 @@ impl HasCommand for Network {
                 }).unwrap();
 
                 let hh = protocol::block::HeaderHash::from_slice(&genesis_tag).expect("blockid invalid");
-                println!("getting block {}", hh);
+                println!("last known start block is {}", hh);
+
                 let mut net = Network::new(&config);
-                let mut b = GetBlock::only(hh.clone()).execute(&mut net.0)
-                    .expect("to get one block at least");
-                blob::write(&storage, hh.bytes(), &b[2..]);
-                let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
-                match blk {
-                    protocol::block::Block::MainBlock(blk) => {
-                        tag::write(&storage, "GENESIS", blk.header.previous_header.as_ref());
+                let mut to_get = hh.clone();
+                loop {
+                    let mut b = GetBlock::only(to_get.clone()).execute(&mut net.0)
+                        .expect("to get one block at least");
+                    blob::write(&storage, hh.bytes(), &b[2..]);
+                    let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
+                    match blk {
+                        protocol::block::Block::MainBlock(blk) => {
+                            println!("block {} epoch {} slotid {}", to_get, blk.header.consensus.slot_id.epoch, blk.header.consensus.slot_id.slotid);
+                            tag::write(&storage, "GENESIS", blk.header.previous_header.as_ref());
+                            to_get = blk.header.previous_header.clone();
+                        }
                     }
                 }
             },
