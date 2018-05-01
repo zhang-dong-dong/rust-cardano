@@ -2,6 +2,9 @@
 extern crate clap;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 extern crate serde_yaml;
 extern crate rcw;
 extern crate wallet_crypto;
@@ -28,6 +31,9 @@ use std::path::{PathBuf};
 
 fn main() {
     use clap::{App, Arg};
+
+    env_logger::init();
+    trace!("Starting application, {}-{}", crate_name!(), crate_version!());
 
     let matches = App::new(crate_name!())
         .version(crate_version!())

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
-use std::io;
+use std::{io, fmt, result};
 
 use packet;
 use packet::{Handshake};
@@ -28,7 +28,7 @@ impl From<ntt::Error> for Error {
     fn from(e: ntt::Error) -> Self { Error::NttError(e) }
 }
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
 
 /// Light ID create by the server or by the client
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
@@ -50,6 +50,11 @@ impl LightId {
     }
     pub fn next(self) -> Self {
         LightId(self.0 + 1)
+    }
+}
+impl fmt::Display for LightId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -252,6 +257,7 @@ impl<T: Write+Read> Connection<T> {
     }
 
     pub fn send_nodeid(&mut self, id: LightId, nodeid: &ntt::protocol::NodeId) -> Result<()> {
+        trace!("send NodeID {} associated to light id {}", nodeid, id);
         self.ntt.light_send_data(id.0, nodeid.as_ref())?;
         Ok(())
     }
@@ -295,7 +301,7 @@ impl<T: Write+Read> Connection<T> {
                 let id = LightId::new(cid);
                 if let Some(_) = self.server_cons.get(&id) {
                     // TODO report this as an error to the logger
-                    eprintln!("light id created twice");
+                    error!("light id created twice, {}", id);
                     Err(Error::ServerCreatedLightIdTwice(id))
                 } else {
                     //let con = LightConnection::new_expecting_nodeid(id);
@@ -304,7 +310,7 @@ impl<T: Write+Read> Connection<T> {
                 }
             },
             Command::Control(ch, cid) => {
-                eprintln!("{}:{}: LightId({}) Unsupported control `{:?}`", file!(), line!(), cid, ch);
+                error!("LightId({}) Unsupported control `{:?}`", cid, ch);
                 Err(Error::UnsupportedControl(ch))
             },
             ntt::protocol::Command::Data(server_id, len) => {
@@ -353,7 +359,7 @@ impl<T: Write+Read> Connection<T> {
                         }
                     },
                     None => {
-                        println!("{}:{}: LightId({}) does not exists but received data", file!(), line!(), server_id);
+                        warn!("LightId({}) does not exists but received data", server_id);
                         Ok(())
                     },
                 }
@@ -365,7 +371,7 @@ impl<T: Write+Read> Connection<T> {
 pub mod command {
     use std::io::{Read, Write};
     use super::{LightId, Connection};
-    use wallet_crypto::cbor;
+    use wallet_crypto::{cbor};
     use block;
     use packet;
 
@@ -375,6 +381,7 @@ pub mod command {
 
         fn execute(&self, connection: &mut Connection<W>) -> Result<Self::Output, &'static str> {
             let id = connection.get_free_light_id();
+            trace!("creating light connection: {}", id);
 
             connection.new_light_connection(id).unwrap();
             connection.broadcast().unwrap(); // expect ack of connection creation

@@ -43,6 +43,7 @@ impl<W: Sized+Write+Read> Connection<W> {
     }
 
     pub fn handshake(drg_seed: u64, stream: W) -> Result<Self> {
+        trace!("sending initial handshake");
         let mut conn = Connection { stream: stream, drg: drg_seed, debug: false };
         let mut buf = vec![];
         protocol::handshake(&mut buf);
@@ -91,9 +92,7 @@ impl<W: Sized+Write+Read> Connection<W> {
 
     // emit utility
     fn emit(&mut self, step: &str, dat: &[u8]) -> Result<()> {
-        if self.debug {
-            println!("NTT: {} {:?}", step, dat);
-        }
+        trace!("{} {:?}", step, dat);
         self.stream.write_all(dat)?;
         Ok(())
     }
@@ -151,6 +150,8 @@ impl<W: Sized+Write+Read> Connection<W> {
 }
 
 pub mod protocol {
+    use std::{fmt};
+    use wallet_crypto::util::{hex};
     const PROTOCOL_VERSION : u32 = 0x00000000;
 
     #[derive(Debug)]
@@ -177,6 +178,11 @@ pub mod protocol {
 
     #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
     pub struct NodeId([u8;9]);
+    impl fmt::Display for NodeId {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}", hex::encode(self.as_ref()))
+        }
+    }
 
     const NODEID_SYN : u8 = 0x53; // 'S'
     const NODEID_ACK : u8 = 0x41; // 'A'

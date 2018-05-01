@@ -1,4 +1,6 @@
 extern crate wallet_crypto;
+#[macro_use]
+extern crate log;
 
 pub mod ntt;
 pub mod block;
