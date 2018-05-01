@@ -86,8 +86,6 @@ impl cbor::CborValue for HeaderHash {
     }
 }
 
-type Todo = Vec<Value>;
-
 #[derive(Debug)]
 pub struct MainBlockHeader {
     pub protocol_magic: ProtocolMagic,
