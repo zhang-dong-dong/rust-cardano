@@ -315,9 +315,11 @@ pub struct PackParameters {
 pub fn pack_blobs(storage: &mut Storage, params: &PackParameters) -> PackHash {
     let mut writer = pack::PackWriter::init(&storage.config);
     let block_hashes = storage.config.list_blob(params.limit_nb_blobs);
+    let mut blob_packed = Vec::new();
     for bh in block_hashes.iter() {
         let blob = blob::read(storage, bh);
         writer.append(bh, &blob[..]);
+        blob_packed.push(bh);
         match params.limit_size {
             None => {},
             Some(sz) => {
@@ -334,7 +336,7 @@ pub fn pack_blobs(storage: &mut Storage, params: &PackParameters) -> PackHash {
     tmpfile.render_permanent(&storage.config.get_index_filepath(&packhash)).unwrap();
 
     if params.delete_blobs_after_pack {
-        for bh in block_hashes.iter() {
+        for bh in blob_packed.iter() {
             blob::remove(storage, bh);
         }
     }
