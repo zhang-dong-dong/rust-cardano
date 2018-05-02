@@ -99,6 +99,9 @@ impl HasCommand for Network {
                     blob::write(&storage, to_get.bytes(), &b[2..]);
                     let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
                     match blk {
+                        protocol::block::Block::GenesisBlock(blk) => {
+                            panic!("genesis block reached {:?}", blk);
+                        }
                         protocol::block::Block::MainBlock(blk) => {
                             println!("block {} epoch {} slotid {}", to_get, blk.header.consensus.slot_id.epoch, blk.header.consensus.slot_id.slotid);
                             tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());

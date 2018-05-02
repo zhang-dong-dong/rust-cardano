@@ -103,6 +103,9 @@ impl HasCommand for Block {
                                 let blk : protocol::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
                                 println!("blk location: {:?}", loc);
                                 match blk {
+                                    protocol::block::Block::GenesisBlock(mblock) => {
+                                        println!("genesis block display unimplemented")
+                                    },
                                     protocol::block::Block::MainBlock(mblock) => {
                                         let hdr = mblock.header;
                                         let body = mblock.body;

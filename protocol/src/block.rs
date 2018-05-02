@@ -488,11 +488,13 @@ pub mod main {
 
 #[derive(Debug)]
 pub enum Block {
-    MainBlock(main::Block)
+    GenesisBlock(Vec<cbor::Value>),
+    MainBlock(main::Block),
 }
 impl fmt::Display for Block {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Block::GenesisBlock(ref blk) => write!(f, "{:?}", blk),
             &Block::MainBlock(ref blk) => write!(f, "{}", blk)
         }
     }
@@ -505,8 +507,10 @@ impl cbor::CborValue for Block {
     fn decode(value: cbor::Value) -> cbor::Result<Self> {
         value.array().and_then(|array| {
             let (array, code)  = cbor::array_decode_elem(array, 0).embed("enumeration code")?;
-            // if code == 0u64 { TODO: support genesis::Block
-            if code == 1u64 {
+            if code == 0u64 {
+                // TODO decode content
+                Ok(Block::GenesisBlock(array))
+            } else if code == 1u64 {
                 let (array, blk) = cbor::array_decode_elem(array, 0)?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(Block::MainBlock(blk))
