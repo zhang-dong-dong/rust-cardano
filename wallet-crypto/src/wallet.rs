@@ -10,6 +10,7 @@ use hdwallet;
 use address;
 use tx;
 use config;
+use bip39;
 use bip44::{Addressing, AddrType, BIP44_PURPOSE, BIP44_COIN_TYPE};
 use tx::fee::Algorithm;
 
@@ -50,6 +51,18 @@ impl Wallet {
     /// create a new wallet from the given seed
     pub fn new_from_seed(seed: &hdwallet::Seed) -> Self {
         let key= hdwallet::XPrv::generate_from_seed(&seed)
+                    .derive(BIP44_PURPOSE)
+                    .derive(BIP44_COIN_TYPE);
+        Wallet {
+            cached_root_key: key,
+            config: config::Config::default(),
+            selection_policy: tx::fee::SelectionPolicy::default()
+        }
+    }
+
+    /// create a new wallet from the given seed
+    pub fn new_from_bip39(seed: &bip39::Seed) -> Self {
+        let key= hdwallet::XPrv::generate_from_bip39(seed)
                     .derive(BIP44_PURPOSE)
                     .derive(BIP44_COIN_TYPE);
         Wallet {
