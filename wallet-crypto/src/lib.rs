@@ -2,6 +2,9 @@
 extern crate serde_derive;
 extern crate serde;
 
+#[macro_use]
+extern crate log;
+
 extern crate rcw;
 
 mod crc32;
@@ -15,7 +18,6 @@ pub mod hdpayload;
 pub mod tx;
 pub mod coin;
 pub mod redeem;
-pub mod log;
 
 pub mod cbor;
 pub mod bip44;
