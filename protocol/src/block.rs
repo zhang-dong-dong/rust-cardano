@@ -310,7 +310,7 @@ pub mod genesis {
         fn decode(value: cbor::Value) -> cbor::Result<Self> {
             value.array().and_then(|array| {
                 Ok(Body { slot_leaders: array })
-            }).embed("While decoding Body")
+            }).embed("While decoding genesis::Body")
         }
     }
 
@@ -355,7 +355,7 @@ pub mod genesis {
                 let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(BlockHeader::new(p_magic, prv_header, body_proof, consensus, extra_data))
-            }).embed("While decoding a MainBlockHeader")
+            }).embed("While decoding a genesis::BlockHeader")
         }
     }
 
@@ -399,10 +399,10 @@ pub mod genesis {
         fn decode(value: cbor::Value) -> cbor::Result<Self> {
             value.array().and_then(|array| {
                 let (array, epoch) = cbor::array_decode_elem(array, 0).embed("epoch")?;
-                let (array, chain_difficulty) = cbor::array_decode_elem(array, 0).embed("chain_difficulty")?;
+                let (array, chain_difficulty) : (Vec<cbor::Value>, Vec<u32>) = cbor::array_decode_elem(array, 0).embed("chain_difficulty")?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
-                Ok(Consensus { epoch: epoch, chain_difficulty: chain_difficulty })
-            }).embed("While decoding main::Consensus")
+                Ok(Consensus { epoch: epoch, chain_difficulty: chain_difficulty[0] })
+            }).embed("While decoding genesis::Consensus")
         }
     }
 }
@@ -515,7 +515,7 @@ pub mod main {
                 let (array, upd) = cbor::array_decode_elem(array, 0).embed("update")?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(Body::new(tx, scc, dlg, upd))
-            }).embed("While decoding Body")
+            }).embed("While decoding main::Body")
         }
     }
 
@@ -560,7 +560,7 @@ pub mod main {
                 let (array, extra_data) = cbor::array_decode_elem(array, 0).embed("extra_data")?;
                 if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
                 Ok(BlockHeader::new(p_magic, prv_header, body_proof, consensus, extra_data))
-            }).embed("While decoding a MainBlockHeader")
+            }).embed("While decoding a main::BlockHeader")
         }
     }
 
