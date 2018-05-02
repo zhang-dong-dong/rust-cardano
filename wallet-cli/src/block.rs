@@ -3,7 +3,7 @@ use wallet_crypto::{cbor};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, StorageConfig, pack_blobs, block_location, block_read_location, tag, pack, PackParameters};
+use storage::{pack_blobs, block_location, block_read_location, tag, pack, PackParameters};
 use protocol;
 use ansi_term::Colour::*;
 
@@ -36,7 +36,7 @@ impl HasCommand for Block {
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         match args.subcommand() {
             ("debug-index", opts) => {
-                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let store_config = config.get_storage_config();
                 match opts {
                     None    => {
                         let vs = store_config.list_indexes();
@@ -58,8 +58,7 @@ impl HasCommand for Block {
                 }
             },
             ("pack", Some(opts)) => {
-                let store_config = StorageConfig::new(&config.storage, &config.network_type);
-                let mut storage = Storage::init(&store_config).unwrap();
+                let mut storage = config.get_storage().unwrap();
                 let pack_params = PackParameters {
                     limit_nb_blobs: None,
                     limit_size: None,
@@ -69,8 +68,7 @@ impl HasCommand for Block {
                 println!("pack created: {}", hex::encode(&packhash));
             },
             ("tag", Some(opt)) => {
-                let store_config = StorageConfig::new(&config.storage, &config.network_type);
-                let mut storage = Storage::init(&store_config).unwrap();
+                let mut storage = config.get_storage().unwrap();
 
                 let tag = value_t!(opt.value_of("tag-name"), String).unwrap();
 
@@ -85,8 +83,7 @@ impl HasCommand for Block {
                 }
             },
             ("cat", Some(opt)) => {
-                let store_config = StorageConfig::new(&config.storage, &config.network_type);
-                let storage = Storage::init(&store_config).unwrap();
+                let storage = config.get_storage().unwrap();
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
                 let hh_bytes = match tag::read(&storage, &hh_hex) {
                     None => hex::decode(&hh_hex).unwrap(),

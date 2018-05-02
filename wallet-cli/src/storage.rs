@@ -558,7 +558,6 @@ pub mod pack {
                 if &hash == blk { Some(ofs_element) } else { None }
             },
             2 => {
-                let start = start_elements.0;
                 let ofs_element = start_elements.0;
                 let ofs = ofs_element as u64 * super::HASH_SIZE as u64;
                 file.seek(SeekFrom::Start(HEADER_SIZE as u64 + ofs)).unwrap();

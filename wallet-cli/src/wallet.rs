@@ -5,7 +5,7 @@ use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use account::{Account};
-use storage::{Storage, StorageConfig, pack_blobs, pack, PackParameters};
+use storage::{pack_blobs, pack, PackParameters};
 use rand;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,8 +47,7 @@ impl HasCommand for Wallet {
                 // expect no existing wallet
                 assert!(cfg.wallet.is_none());
                 cfg.wallet = Some(Wallet::generate());
-                let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
-                let _ = Storage::init(&store_config).unwrap();
+                let _storage = cfg.get_storage().unwrap();
                 Some(cfg) // we need to update the config's wallet
             },
             ("address", Some(opts)) => {
