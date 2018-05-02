@@ -9,6 +9,8 @@ use self::rcw::ed25519::signature_extended;
 use self::rcw::ed25519;
 use self::rcw::util::fixed_time_eq;
 
+use bip39;
+
 use std::{fmt, result};
 use std::marker::PhantomData;
 use util::{hex};
@@ -148,6 +150,16 @@ impl XPrv {
             }
             iter = iter + 1;
         }
+
+        Self::from_bytes(out)
+    }
+
+    pub fn generate_from_bip39(bytes: &bip39::Seed) -> Self {
+        let mut out = [0u8; XPRV_SIZE];
+
+        mk_ed25519_extended(&mut out[0..64], &bytes.as_ref()[0..32]);
+        out[31] &= 0b1101_1111; // set 3rd highest bit to 0 as per the spec
+        out[64..96].clone_from_slice(&bytes.as_ref()[32..64]);
 
         Self::from_bytes(out)
     }
