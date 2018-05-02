@@ -68,7 +68,7 @@ impl HasCommand for Network {
             ("sync", _) => {
                 let storage = config.get_storage().unwrap();
 
-                let genesis_tag = tag::read(&storage, "GENESIS").or_else(|| {
+                let genesis_tag = tag::read(&storage, "OLDEST_BLOCK").or_else(|| {
                     tag::read(&storage, "HEAD")
                 }).unwrap();
 
@@ -85,7 +85,7 @@ impl HasCommand for Network {
                     match blk {
                         protocol::block::Block::MainBlock(blk) => {
                             println!("block {} epoch {} slotid {}", to_get, blk.header.consensus.slot_id.epoch, blk.header.consensus.slot_id.slotid);
-                            tag::write(&storage, "GENESIS", blk.header.previous_header.as_ref());
+                            tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());
                             to_get = blk.header.previous_header.clone();
                         }
                     }
