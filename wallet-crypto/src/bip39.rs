@@ -1,7 +1,7 @@
 use rcw::hmac::{Hmac};
 use rcw::sha2::{Sha512};
 use rcw::pbkdf2::{pbkdf2};
-use std::{fmt, result};
+use std::{fmt, result, str};
 use util::{hex};
 use bit_vec::{BitVec};
 use bitreader::{BitReader};
@@ -274,6 +274,11 @@ impl MnemonicString {
         Ok(MnemonicString(s))
     }
 }
+impl fmt::Display for MnemonicString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum Type {
@@ -282,6 +287,30 @@ pub enum Type {
     Type18Words,
     Type21Words,
     Type24Words,
+}
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Type::Type12Words => write!(f, "12-words"),
+            &Type::Type15Words => write!(f, "15-words"),
+            &Type::Type18Words => write!(f, "18-words"),
+            &Type::Type21Words => write!(f, "21-words"),
+            &Type::Type24Words => write!(f, "24-words"),
+        }
+    }
+}
+impl str::FromStr for Type {
+    type Err = &'static str;
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        match s {
+            "12-words" => Ok(Type::Type12Words),
+            "15-words" => Ok(Type::Type15Words),
+            "18-words" => Ok(Type::Type18Words),
+            "21-words" => Ok(Type::Type21Words),
+            "24-words" => Ok(Type::Type24Words),
+            _          => Err("Unknown bip39 mnemonic size")
+        }
+    }
 }
 impl Type {
     pub fn from_word_count(len: usize) -> Result<Self> {

@@ -11,6 +11,7 @@ extern crate wallet_crypto;
 extern crate protocol;
 extern crate rand;
 extern crate ansi_term;
+extern crate termion;
 
 mod config;
 mod account;
