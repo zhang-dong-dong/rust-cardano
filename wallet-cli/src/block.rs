@@ -77,11 +77,14 @@ impl HasCommand for Block {
                 }
             },
             ("cat", Some(opt)) => {
-                let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
-                let hh_bytes = hex::decode(&hh_hex).unwrap();
-                let hh = protocol::block::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
                 let storage = Storage::init(&store_config).unwrap();
+                let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
+                let hh_bytes = match tag::read(&storage, &hh_hex) {
+                    None => hex::decode(&hh_hex).unwrap(),
+                    Some(t) => t
+                };
+                let hh = protocol::block::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
 
                 match block_location(&storage, hh.bytes()) {
                     None => {
