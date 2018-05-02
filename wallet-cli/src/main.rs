@@ -12,6 +12,7 @@ extern crate protocol;
 extern crate rand;
 extern crate ansi_term;
 extern crate termion;
+extern crate flate2;
 
 mod config;
 mod account;

@@ -11,6 +11,7 @@ use rcw;
 use rand;
 
 const HASH_SIZE : usize = 32;
+const USE_COMPRESSION : bool = true;
 
 pub type BlockHash = [u8;HASH_SIZE];
 pub type PackHash = [u8;HASH_SIZE];
@@ -215,14 +216,32 @@ pub mod tag {
 pub mod blob {
     use std::fs;
     use std::io::{Write,Read};
+    use flate2::Compression;
+    use flate2::write::DeflateEncoder;
+    use flate2::write::DeflateDecoder;
 
     pub fn write(storage: &super::Storage, hash: &super::BlockHash, block: &[u8]) {
-        let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Blob);
-        tmp_file.file.write_all(block).unwrap();
-
-        // finalize
         let path = storage.config.get_blob_filepath(&hash);
+        let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Blob);
+        if super::USE_COMPRESSION {
+            let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
+            e.write_all(block).unwrap();
+            let compressed_block = e.finish().unwrap();
+            tmp_file.file.write_all(&compressed_block[..]).unwrap();
+        } else {
+            tmp_file.file.write_all(block).unwrap();
+        }
         tmp_file.render_permanent(&path).unwrap();
+
+    }
+
+    pub fn read_raw(storage: &super::Storage, hash: &super::BlockHash) -> Vec<u8> {
+        let mut content = Vec::new();
+        let path = storage.config.get_blob_filepath(&hash);
+
+        let mut file = fs::File::open(path).unwrap();
+        file.read_to_end(&mut content).unwrap();
+        content
     }
 
     pub fn read(storage: &super::Storage, hash: &super::BlockHash) -> Vec<u8> {
@@ -231,7 +250,16 @@ pub mod blob {
 
         let mut file = fs::File::open(path).unwrap();
         file.read_to_end(&mut content).unwrap();
-        content
+
+        if super::USE_COMPRESSION {
+            let mut writer = Vec::new();
+            let mut deflater = DeflateDecoder::new(writer);
+            deflater.write_all(&content[..]).unwrap();
+            writer = deflater.finish().unwrap();
+            writer
+        } else {
+            content
+        }
     }
 
     pub fn exist(storage: &super::Storage, hash: &super::BlockHash) -> bool {
@@ -317,7 +345,7 @@ pub fn pack_blobs(storage: &mut Storage, params: &PackParameters) -> PackHash {
     let block_hashes = storage.config.list_blob(params.limit_nb_blobs);
     let mut blob_packed = Vec::new();
     for bh in block_hashes.iter() {
-        let blob = blob::read(storage, bh);
+        let blob = blob::read_raw(storage, bh);
         writer.append(bh, &blob[..]);
         blob_packed.push(bh);
         match params.limit_size {
@@ -609,15 +637,26 @@ pub mod pack {
         }
     }
 
+    use flate2::write::DeflateDecoder;
+
     pub fn read_block_at(mut file: &fs::File, ofs: Offset) -> Vec<u8>{
         let mut sz_buf = [0u8;SIZE_SIZE];
         
         file.seek(SeekFrom::Start(ofs)).unwrap();
         file.read_exact(&mut sz_buf).unwrap();
+
         let sz = read_size(&sz_buf);
         let mut v : Vec<u8> = repeat(0).take(sz as usize).collect();
         file.read_exact(v.as_mut_slice()).unwrap();
-        v
+        if super::USE_COMPRESSION {
+            let mut writer = Vec::new();
+            let mut deflater = DeflateDecoder::new(writer);
+            deflater.write_all(&v[..]).unwrap();
+            writer = deflater.finish().unwrap();
+            writer
+        } else {
+            v
+        }
     }
 
     // A Writer for a specific pack that accumulate some numbers for reportings,
