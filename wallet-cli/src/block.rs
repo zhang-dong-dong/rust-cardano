@@ -25,6 +25,7 @@ impl HasCommand for Block {
             )
             .subcommand(SubCommand::with_name("pack")
                 .about("internal pack command")
+                .arg(Arg::with_name("preserve-blobs").long("keep").help("keep what is being packed in its original state"))
             )
             .subcommand(SubCommand::with_name("tag")
                 .about("show content of a tag or set a tag")
@@ -56,13 +57,13 @@ impl HasCommand for Block {
                     }
                 }
             },
-            ("pack", _) => {
+            ("pack", Some(opts)) => {
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
                 let mut storage = Storage::init(&store_config).unwrap();
                 let pack_params = PackParameters {
                     limit_nb_blobs: None,
                     limit_size: None,
-                    delete_blobs_after_pack: false,
+                    delete_blobs_after_pack: ! opts.is_present("preserve-blobs"),
                 };
                 let packhash = pack_blobs(&mut storage, &pack_params);
                 println!("pack created: {}", hex::encode(&packhash));
