@@ -1,14 +1,11 @@
 use wallet_crypto::util::{hex};
+use wallet_crypto::{cbor};
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
-use storage::{Storage, StorageConfig, block_location, block_read_location,pack_blobs, pack, PackParameters};
-use wallet_crypto::cbor;
-
-use ansi_term::Colour::*;
-
+use storage::{Storage, StorageConfig, pack_blobs, block_location, block_read_location, tag, pack, PackParameters};
 use protocol;
-//use protocol::{packet};
+use ansi_term::Colour::*;
 
 pub struct Block;
 
@@ -22,12 +19,16 @@ impl HasCommand for Block {
                 .about("show content of a block")
                 .arg(Arg::with_name("blockid").help("hexadecimal encoded block id").index(1).required(true))
             )
+            .subcommand(SubCommand::with_name("tag")
+                .about("show content of a tag or set a tag")
+                .arg(Arg::with_name("tag-name").help("name of the tag").index(1).required(true))
+                .arg(Arg::with_name("tag-value").help("value to set to the given tag").index(2).required(false))
+            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         match args.subcommand() {
             ("debug-index", opts) => {
                 let store_config = StorageConfig::new(&config.storage, &config.network_type);
-                let storage = Storage::init(&store_config).unwrap();
                 match opts {
                     None    => {
                         let vs = store_config.list_indexes();
@@ -41,7 +42,7 @@ impl HasCommand for Block {
                             .unwrap();
                         let mut packref = [0u8;32];
                         packref.clone_from_slice(&hex::decode(&packrefhex).unwrap()[..]);
-                        let (fanout, refs) = pack::dump_index(&store_config, &packref).unwrap();
+                        let (_, refs) = pack::dump_index(&store_config, &packref).unwrap();
                         for r in refs.iter() {
                             println!("{}", hex::encode(r));
                         }
@@ -58,6 +59,22 @@ impl HasCommand for Block {
                 };
                 let packhash = pack_blobs(&mut storage, &pack_params);
                 println!("pack created: {}", hex::encode(&packhash));
+            },
+            ("tag", Some(opt)) => {
+                let store_config = StorageConfig::new(&config.storage, &config.network_type);
+                let mut storage = Storage::init(&store_config).unwrap();
+
+                let tag = value_t!(opt.value_of("tag-name"), String).unwrap();
+
+                match opt.value_of("tag-value") {
+                    None => {
+                        let value = hex::encode(&tag::read(&storage, &tag).unwrap());
+                        println!("{}", value);
+                    },
+                    Some(value) => {
+                        tag::write(&storage, &tag, &hex::decode(value).unwrap());
+                    }
+                }
             },
             ("cat", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
