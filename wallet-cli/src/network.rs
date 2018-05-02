@@ -84,7 +84,7 @@ impl HasCommand for Network {
                 loop {
                     let mut b = GetBlock::only(to_get.clone()).execute(&mut net.0)
                         .expect("to get one block at least");
-                    blob::write(&storage, hh.bytes(), &b[2..]);
+                    blob::write(&storage, to_get.bytes(), &b[2..]);
                     let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
                     match blk {
                         protocol::block::Block::MainBlock(blk) => {
