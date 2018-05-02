@@ -104,7 +104,8 @@ impl HasCommand for Block {
                                 println!("blk location: {:?}", loc);
                                 match blk {
                                     protocol::block::Block::GenesisBlock(mblock) => {
-                                        println!("genesis block display unimplemented")
+                                        println!("genesis block display unimplemented");
+                                        println!("{:?}", mblock)
                                     },
                                     protocol::block::Block::MainBlock(mblock) => {
                                         let hdr = mblock.header;

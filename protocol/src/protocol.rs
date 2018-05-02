@@ -283,6 +283,7 @@ impl<T: Write+Read> Connection<T> {
                         Ok(())
                     },
                     Some(ServerLightConnection::Established(v)) => {
+                        self.map_to_client.remove(&v);
                         /*
                         if let Some(_) = v.received {
                             self.server_dones.insert(id, v);
@@ -348,7 +349,7 @@ impl<T: Write+Read> Connection<T> {
                                 self.server_cons.remove(&id);
                                 self.server_cons.insert(id, ServerLightConnection::Established(nodeid.clone()));
 
-                                match self.client_cons.iter().find(|(k,v)| v.node_id.match_ack(&nodeid)) {
+                                match self.client_cons.iter().find(|(_,v)| v.node_id.match_ack(&nodeid)) {
                                     None        => { Ok(()) },
                                     Some((z,_)) => {
                                         self.map_to_client.insert(nodeid, *z);
@@ -402,7 +403,7 @@ pub mod command {
     }
 
     impl<W> Command<W> for GetBlockHeader where W: Read+Write {
-        type Output = block::MainBlockHeader;
+        type Output = block::BlockHeader;
         fn cmd(&self, connection: &mut Connection<W>, id: LightId) -> Result<Self::Output, &'static str> {
             // require the initial header
             let (get_header_id, get_header_dat) = packet::send_msg_getheaders(&[], &self.0);
@@ -415,8 +416,8 @@ pub mod command {
             match l {
                 packet::BlockHeaderResponse::Ok(mut ll) => {
                     match ll.pop_front() {
-                        Some(block::BlockHeader::MainBlockHeader(bh)) => Ok(bh),
-                        None => panic!("pop front")
+                        Some(bh) => Ok(bh),
+                        None     => panic!("pop front")
                     }
                 },
             }

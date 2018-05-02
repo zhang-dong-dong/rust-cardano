@@ -29,9 +29,9 @@ impl Network {
 }
 
 // TODO return BlockHeader not MainBlockHeader
-fn network_get_head_header(storage: &storage::Storage, net: &mut Network) -> protocol::block::MainBlockHeader {
+fn network_get_head_header(storage: &storage::Storage, net: &mut Network) -> protocol::block::BlockHeader {
     let mbh = GetBlockHeader::first().execute(&mut net.0).expect("to get one header at least");
-    tag::write(&storage, "HEAD", mbh.previous_header.as_ref());
+    tag::write(&storage, "HEAD", mbh.get_previous_header().as_ref());
     mbh
 }
 
@@ -59,7 +59,7 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
                 let storage = config.get_storage().unwrap();
                 let mbh = network_get_head_header(&storage, &mut net);
-                println!("prv block header: {}", mbh.previous_header);
+                println!("prv block header: {}", mbh.get_previous_header());
             },
             ("get-block", Some(opt)) => {
                 let hh_hex = value_t!(opt.value_of("blockid"), String).unwrap();
@@ -82,7 +82,7 @@ impl HasCommand for Network {
                 let oldest_ref = match read_tag {
                     None => {
                         let mbh = network_get_head_header(&storage, &mut net);
-                        mbh.previous_header
+                        mbh.get_previous_header()
                     },
                     Some(oldest_ref) => {
                         let hh = protocol::block::HeaderHash::from_slice(&oldest_ref).expect("blockid invalid");
@@ -100,12 +100,14 @@ impl HasCommand for Network {
                     let blk : protocol::block::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
                     match blk {
                         protocol::block::Block::GenesisBlock(blk) => {
-                            panic!("genesis block reached {:?}", blk);
+                            println!("Genesis block {} epoch {} difficulty {}", to_get, blk.header.consensus.epoch, blk.header.consensus.chain_difficulty);
+                            tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());
+                            to_get = blk.header.previous_header.clone()
                         }
                         protocol::block::Block::MainBlock(blk) => {
                             println!("block {} epoch {} slotid {}", to_get, blk.header.consensus.slot_id.epoch, blk.header.consensus.slot_id.slotid);
                             tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());
-                            to_get = blk.header.previous_header.clone();
+                            to_get = blk.header.previous_header.clone()
                         }
                     }
                 }
