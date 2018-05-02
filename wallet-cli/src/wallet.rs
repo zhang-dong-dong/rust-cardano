@@ -55,7 +55,7 @@ impl HasCommand for Wallet {
                 assert!(cfg.wallet.is_none());
                 cfg.wallet = Some(Wallet::generate());
                 let store_config = StorageConfig::new(&cfg.storage, &cfg.network_type);
-                let storage = Storage::init(&store_config).unwrap();
+                let _ = Storage::init(&store_config).unwrap();
                 Some(cfg) // we need to update the config's wallet
             },
             ("address", Some(opts)) => {
