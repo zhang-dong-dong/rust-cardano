@@ -60,8 +60,8 @@ impl Config {
     pub fn get_block_dir(&self) -> PathBuf {
         match self.block_dir {
             None    => {
-                let mut blk_dir_default = (&self.root_dir).clone();
-                blk_dir_default.push("/blocks");
+                let mut blk_dir_default = self.root_dir.clone();
+                blk_dir_default.push("blocks");
                 blk_dir_default
             },
             Some(ref v) => v.clone(),
