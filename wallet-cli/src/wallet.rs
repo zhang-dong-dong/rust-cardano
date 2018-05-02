@@ -39,13 +39,6 @@ impl HasCommand for Wallet {
                     .multiple(true)
                 )
             )
-            .subcommand(SubCommand::with_name("debug-index")
-                .about("internal debug command")
-                .arg(Arg::with_name("packhash").help("pack to query").index(1))
-            )
-            .subcommand(SubCommand::with_name("pack")
-                .about("internal pack command")
-            )
     }
     fn run(config: Config, args: &ArgMatches) -> Self::Output {
         let mut cfg = config;
