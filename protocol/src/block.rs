@@ -208,7 +208,7 @@ impl cbor::CborValue for HeaderExtraData {
             let (array, extra_data_proof) = cbor::array_decode_elem(array, 0).embed("extra data proof")?;
             if ! array.is_empty() { return cbor::Result::array(array, cbor::Error::UnparsedValues); }
             Ok(HeaderExtraData::new(block_version, software_version, attributes, extra_data_proof))
-        }).embed("While decoding a MainBlockHeader")
+        }).embed("While decoding a HeaderExtraData")
     }
 }
 
@@ -294,7 +294,7 @@ pub mod genesis {
     #[derive(Debug)]
     pub struct Body {
         //pub slot_leaders: Vec<tx::Hash>
-        pub slot_leaders: Vec<cbor::Value>,
+        pub slot_leaders: LinkedList<cbor::Value>,
     }
     /*
     impl fmt::Display for Body {
@@ -308,7 +308,7 @@ pub mod genesis {
             unimplemented!()
         }
         fn decode(value: cbor::Value) -> cbor::Result<Self> {
-            value.array().and_then(|array| {
+            value.iarray().and_then(|array| {
                 Ok(Body { slot_leaders: array })
             }).embed("While decoding genesis::Body")
         }
@@ -320,7 +320,7 @@ pub mod genesis {
         pub previous_header: HeaderHash,
         pub body_proof: BodyProof,
         pub consensus: Consensus,
-        pub extra_data: HeaderExtraData
+        pub extra_data: BlockHeaderAttributes,
     }
     impl fmt::Display for BlockHeader {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -332,7 +332,7 @@ pub mod genesis {
         }
     }
     impl BlockHeader {
-        pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Consensus, ed: HeaderExtraData) -> Self {
+        pub fn new(pm: ProtocolMagic, pb: HeaderHash, bp: BodyProof, c: Consensus, ed: BlockHeaderAttributes) -> Self {
             BlockHeader {
                 protocol_magic: pm,
                 previous_header: pb,
