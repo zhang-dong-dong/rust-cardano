@@ -2,6 +2,7 @@
 members = [
     "rcw",
     "wallet-crypto",
+    "blockchain",
     "wallet-cli",
     "protocol",
 ]
