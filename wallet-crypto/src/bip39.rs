@@ -62,6 +62,11 @@ impl Entropy {
     pub fn entropy21(bytes: [u8;28]) -> Self { Entropy::Entropy21(bytes) }
     pub fn entropy24(bytes: [u8;32]) -> Self { Entropy::Entropy24(bytes) }
 
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        let t = Type::from_key_size(bytes.len() * 8)?;
+        Ok(Self::new(t, bytes))
+    }
+
     pub fn generate<G>(t: Type, gen: G) -> Self
         where G: Fn() -> u8
     {

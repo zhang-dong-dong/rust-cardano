@@ -1,4 +1,4 @@
-use wallet_crypto::{wallet, bip44, bip39};
+use wallet_crypto::{wallet, bip44, bip39, paperwallet};
 use wallet_crypto::util::base58;
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
@@ -34,6 +34,12 @@ impl HasCommand for Wallet {
                     .help("use the given language for the mnemonic")
                     .required(false)
                     .default_value(r"english")
+                )
+                .arg(Arg::with_name("NO PAPER WALLET")
+                    .long("no-paper-wallet")
+                    .takes_value(false)
+                    .help("if this option is set, the interactive mode won't ask you about generating a paperwallet")
+                    .required(false)
                 )
                 .arg(Arg::with_name("MNEMONIC SIZE")
                     .long("number-of-mnemonic-words")
@@ -90,7 +96,8 @@ impl HasCommand for Wallet {
                 let language    = value_t!(opts.value_of("LANGUAGE"), String).unwrap(); // we have a default value
                 let mnemonic_sz = value_t!(opts.value_of("MNEMONIC SIZE"), bip39::Type).unwrap();
                 let password    = value_t!(opts.value_of("PASSWORD"), String).ok();
-                let seed = generate_entropy(language, password, mnemonic_sz);
+                let without_paper_wallet = opts.is_present("NO PAPER WALLET");
+                let seed = generate_entropy(language, password, mnemonic_sz, without_paper_wallet);
                 cfg.wallet = Some(Wallet::generate(seed));
                 let _storage = cfg.get_storage().unwrap();
                 Some(cfg) // we need to update the config's wallet
@@ -240,7 +247,7 @@ fn display_mnemonic_phrase(mnemonic: &bip39::MnemonicString) {
     writeln!(stdout, "Note the following words carrefully as you will need it to recover your wallet.").unwrap();
     writeln!(stdout, "Press `Enter' when you are sure you have saved them.").unwrap();
     writeln!(stdout, "{}", style::NoItalic).unwrap();
-    write!(stdout, "mnemonic: {}{}{}", color::Fg(color::Green), mnemonic, color::Fg(color::Reset));
+    write!(stdout, "mnemonic: {}{}{}", color::Fg(color::Green), mnemonic, color::Fg(color::Reset)).unwrap();
     stdout.flush().unwrap();
     let _ = stdin.read_passwd(&mut stdout).unwrap().unwrap();
     write!(stdout, "{}{}", clear::CurrentLine, cursor::Left(128)).unwrap();
@@ -269,7 +276,34 @@ fn get_mnemonic_words<D>(dic: &D) -> bip39::Mnemonics
     }
 }
 
-fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type) -> bip39::Seed {
+fn generate_paper_wallet<D>(dic: &D, entropy: &bip39::Entropy)
+    where D: bip39::dictionary::Language
+{
+    // 1. gen an IV
+    let mut iv = [0u8; paperwallet::IV_SIZE];
+    for byte in iv.iter_mut() { *byte = rand::random(); }
+    println!("{}", style::Italic);
+    println!("We are about to generate a paperwallet. It mainly is a longer mnemonic phrase");
+    println!("protected with a password (or not, but un-advised) that you can print and store");
+    println!("securely in order to recover your wallet and your funds.");
+    println!("{}", style::NoItalic);
+    // 2. get a password
+    let pwd = new_password();
+    // 3. generate the scrambled entropy
+    let shielded_entropy_bytes = paperwallet::scramble(&iv[..], pwd.as_bytes(), entropy.as_ref());
+    // 4. create an antropy from the given bytes
+    let shielded_entropy = bip39::Entropy::from_slice(&shielded_entropy_bytes).unwrap();
+
+    println!("shielded entropy: {}{}{}{}{}",
+        color::Fg(color::Cyan),
+        style::Bold,
+        shielded_entropy.to_mnemonics().to_string(dic),
+        style::NoBold,
+        color::Fg(color::Reset),
+    );
+}
+
+fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type, no_paper_wallet: bool) -> bip39::Seed {
     assert!(language == "english");
     let dic = &bip39::dictionary::ENGLISH;
 
@@ -282,6 +316,10 @@ fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type) -
 
     let mnemonic = entropy.to_mnemonics().to_string(dic);
     display_mnemonic_phrase(&mnemonic);
+
+    if ! no_paper_wallet {
+        generate_paper_wallet(dic, &entropy);
+    }
 
     bip39::Seed::from_mnemonic_string(&mnemonic, pwd.as_bytes())
 }
