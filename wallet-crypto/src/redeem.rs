@@ -155,12 +155,12 @@ impl PartialEq for Signature {
 impl Eq for Signature {}
 impl PartialOrd for Signature {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        PartialOrd::partial_cmp(&self.0[..], &self.0[..])
+        PartialOrd::partial_cmp(&self.0[..], &other.0[..])
     }
 }
 impl Ord for Signature {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        Ord::cmp(&self.0[..], &self.0[..])
+        Ord::cmp(&self.0[..], &other.0[..])
     }
 }
 

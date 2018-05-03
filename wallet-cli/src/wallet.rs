@@ -69,6 +69,12 @@ impl HasCommand for Wallet {
                     .required(false)
                     .default_value(r"english")
                 )
+                .arg(Arg::with_name("FROM PAPER WALLET")
+                    .long("from-paper-wallet")
+                    .takes_value(false)
+                    .help("if this option is set, we will try to recover the wallet from the paper wallet instead.")
+                    .required(false)
+                )
                 .arg(Arg::with_name("PASSWORD")
                     .long("--password")
                     .takes_value(true)
@@ -107,7 +113,12 @@ impl HasCommand for Wallet {
                 assert!(cfg.wallet.is_none());
                 let language    = value_t!(opts.value_of("LANGUAGE"), String).unwrap(); // we have a default value
                 let password    = value_t!(opts.value_of("PASSWORD"), String).ok();
-                let seed = recover_entropy(language, password);
+                let from_paper_wallet = opts.is_present("FROM PAPER WALLET");
+                let seed = if from_paper_wallet {
+                    recover_paperwallet(language, password)
+                } else {
+                    recover_entropy(language, password)
+                };
                 cfg.wallet = Some(Wallet::generate(seed));
                 let _storage = cfg.get_storage().unwrap();
                 Some(cfg) // we need to update the config's wallet
@@ -274,6 +285,40 @@ fn get_mnemonic_words<D>(dic: &D) -> bip39::Mnemonics
         Err(err) => { panic!("Invalid mnemonic phrase: {}", err); },
         Ok(mn) => mn
     }
+}
+
+fn recover_paperwallet(language: String, opt_pwd: Option<String>) -> bip39::Seed {
+    assert!(language == "english");
+    let dic = &bip39::dictionary::ENGLISH;
+
+    println!("{}", style::Italic);
+    println!("We are about to recover from a paperwallet. It is the mnemonic words");
+    println!("and the password you might have set after generating a new wallet.");
+    println!("{}", style::NoItalic);
+
+    // 1. get the mnemonic words of the paperwallet
+    let shielded_mnemonics = get_mnemonic_words(dic);
+
+    // 2. get the password of the paperwallet
+    let pwd = match opt_pwd {
+        Some(pwd) => pwd,
+        None => get_password()
+    };
+
+    // 3. retrieve the shielded entropy
+    let shielded_entropy = bip39::Entropy::from_mnemonics(&shielded_mnemonics).unwrap();
+
+    // 4. unscramble the shielded entropy
+    let entropy_bytes = paperwallet::unscramble(pwd.as_bytes(), shielded_entropy.as_ref());
+
+    // 5. reconstruct the entropy
+    let entropy = bip39::Entropy::from_slice(&entropy_bytes).unwrap();
+
+    // 6. retrieve the mnemonic string
+    let mnemonics_str = entropy.to_mnemonics().to_string(dic);
+
+    // 7. rebuild the seed
+    bip39::Seed::from_mnemonic_string(&mnemonics_str, pwd.as_bytes())
 }
 
 fn generate_paper_wallet<D>(dic: &D, entropy: &bip39::Entropy)
