@@ -9,6 +9,7 @@ use wallet::{Wallet};
 use command::{HasCommand};
 
 use storage;
+use storage::config::StorageConfig;
 
 use wallet_crypto::config::{ProtocolMagic};
 
@@ -69,8 +70,8 @@ impl Config {
         //match self.clone().block_dir.unwrap_or(blk_dir_default)
     }
 
-    pub fn get_storage_config(&self) -> storage::StorageConfig {
-        storage::StorageConfig::new(&self.get_block_dir(), &self.network_type)
+    pub fn get_storage_config(&self) -> StorageConfig {
+        StorageConfig::new(&self.get_block_dir(), &self.network_type)
     }
     pub fn get_storage(&self) -> io::Result<storage::Storage> {
         storage::Storage::init(&self.get_storage_config())

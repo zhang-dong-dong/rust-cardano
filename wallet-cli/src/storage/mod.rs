@@ -1,3 +1,5 @@
+pub mod types;
+pub mod config;
 use std::path::{PathBuf, Path};
 use std::{fs, io};
 use std::fs::OpenOptions;
@@ -10,26 +12,14 @@ use rcw;
 
 use rand;
 
-const HASH_SIZE : usize = 32;
+use self::types::*;
+use self::config::*;
+
 const USE_COMPRESSION : bool = true;
-
-pub type BlockHash = [u8;HASH_SIZE];
-pub type PackHash = [u8;HASH_SIZE];
-
-#[derive(Clone)]
-pub struct StorageConfig {
-    pub root_path: PathBuf,
-    pub blk_type: String, // example "mainnet" or "testnet"
-}
 
 pub struct Storage {
     config: StorageConfig,
     fanouts: BTreeMap<PackHash, pack::Fanout>,
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub enum StorageFileType {
-    Pack, Index, Blob, Tag
 }
 
 impl Storage {
@@ -53,90 +43,6 @@ impl Storage {
 
         let storage = Storage { config: cfg.clone(), fanouts: fanouts };
         Ok(storage)
-    }
-}
-
-impl StorageConfig {
-    pub fn new(path_buf: &PathBuf, blk_type: &String) -> Self {
-        StorageConfig { root_path: path_buf.clone(), blk_type: blk_type.clone() }
-    }
-    pub fn get_path(&self) -> PathBuf {
-        let mut p = self.root_path.clone();
-        p.push(&self.blk_type);
-        p
-    }
-    pub fn get_filetype_dir(&self, ft: StorageFileType) -> PathBuf {
-        let mut p = self.get_path();
-        match ft {
-            StorageFileType::Pack => p.push("pack/"),
-            StorageFileType::Index => p.push("index/"),
-            StorageFileType::Blob => p.push("blob/"),
-            StorageFileType::Tag => p.push("tag/"),
-        }
-        p
-    }
-    pub fn get_pack_filepath(&self, packhash: &PackHash) -> PathBuf {
-        let mut p = self.get_filetype_dir(StorageFileType::Pack);
-        p.push(encode(packhash));
-        p
-    }
-    pub fn get_index_filepath(&self, packhash: &PackHash) -> PathBuf {
-        let mut p = self.get_filetype_dir(StorageFileType::Index);
-        p.push(encode(packhash));
-        p
-    }
-    pub fn get_blob_filepath(&self, blockhash: &BlockHash) -> PathBuf {
-        let mut p = self.get_filetype_dir(StorageFileType::Blob);
-        p.push(encode(blockhash));
-        p
-    }
-    pub fn get_tag_filepath<P: AsRef<Path>>(&self, s: P) -> PathBuf {
-        let mut p = self.get_filetype_dir(StorageFileType::Tag);
-        p.push(s);
-        p
-    }
-
-    pub fn list_indexes(&self) -> Vec<PackHash> {
-        let mut packs = Vec::new();
-        let p = self.get_filetype_dir(StorageFileType::Index);
-        for entry in fs::read_dir(p).unwrap() {
-            let entry = entry.unwrap();
-            if entry.file_type().unwrap().is_file() {
-                if let Ok(s) = entry.file_name().into_string() {
-                    if s.len() == 64 {
-                        let v = decode(s.as_ref()).unwrap();
-                        let mut packref = [0;HASH_SIZE];
-                        packref.clone_from_slice(&v[..]);
-                        packs.push(packref);
-                    }
-                }
-            }
-        }
-        packs
-    }
-
-    pub fn list_blob(&self, limits: Option<u32>) -> Vec<BlockHash> {
-        let mut blobs = Vec::new();
-        let p = self.get_filetype_dir(StorageFileType::Blob);
-        for entry in fs::read_dir(p).unwrap() {
-            let entry = entry.unwrap();
-            if entry.file_type().unwrap().is_file() {
-                if let Ok(s) = entry.file_name().into_string() {
-                    if s.len() == 64 {
-                        let v = decode(s.as_ref()).unwrap();
-                        let mut blobref = [0;HASH_SIZE];
-                        blobref.clone_from_slice(&v[..]);
-                        blobs.push(blobref);
-                        if blobs.len() == 0xffffffff { break };
-                        match limits {
-                            None => {},
-                            Some(l) => if blobs.len() as u32 >= l { break }
-                        }
-                    }
-                }
-            }
-        }
-        blobs
     }
 }
 
@@ -391,6 +297,7 @@ pub mod pack {
     use std::fs;
     use storage::rcw::blake2b;
     use storage::rcw::digest::Digest;
+    use storage::types::HASH_SIZE;
 
     const MAGIC : &[u8] = b"ADAPACK1";
     const MAGIC_SIZE : usize = 8;
@@ -482,7 +389,7 @@ pub mod pack {
     }
 
     fn file_read_hash(mut file: &fs::File) -> super::BlockHash {
-        let mut buf = [0u8;super::HASH_SIZE];
+        let mut buf = [0u8;HASH_SIZE];
         file.read_exact(&mut buf).unwrap();
         buf
     }
@@ -582,14 +489,14 @@ pub mod pack {
             0 => None,
             1 => {
                 let ofs_element = start_elements.0;
-                let ofs = ofs_element as u64 * super::HASH_SIZE as u64;
+                let ofs = ofs_element as u64 * HASH_SIZE as u64;
                 file.seek(SeekFrom::Start(HEADER_SIZE as u64 + ofs)).unwrap();
                 let hash = file_read_hash(file);
                 if &hash == blk { Some(ofs_element) } else { None }
             },
             2 => {
                 let ofs_element = start_elements.0;
-                let ofs = ofs_element as u64 * super::HASH_SIZE as u64;
+                let ofs = ofs_element as u64 * HASH_SIZE as u64;
                 file.seek(SeekFrom::Start(HEADER_SIZE as u64 + ofs)).unwrap();
                 let hash = file_read_hash(file);
                 let hash2 = file_read_hash(file);
@@ -599,7 +506,7 @@ pub mod pack {
                 let start = start_elements.0;
                 let end = start_elements.0 + n;
                 let mut ofs_element = start;
-                let ofs = ofs_element as u64 * super::HASH_SIZE as u64;
+                let ofs = ofs_element as u64 * HASH_SIZE as u64;
                 file.seek(SeekFrom::Start(HEADER_SIZE as u64 + ofs)).unwrap();
                 while ofs_element < end {
                     let hash = file_read_hash(file);
@@ -615,7 +522,7 @@ pub mod pack {
 
     pub fn resolve_index_offset(mut file: &fs::File, fanout: &Fanout, index_offset: IndexOffset) -> Offset {
         let FanoutNb(total) = fanout.get_total();
-        let ofs = HEADER_SIZE as u64 + super::HASH_SIZE as u64 * total as u64 + OFF_SIZE as u64 * index_offset as u64;
+        let ofs = HEADER_SIZE as u64 + HASH_SIZE as u64 * total as u64 + OFF_SIZE as u64 * index_offset as u64;
         file.seek(SeekFrom::Start(ofs)).unwrap();
         file_read_offset(&mut file)
     }
@@ -707,7 +614,7 @@ pub mod pack {
         }
 
         pub fn finalize(&mut self) -> (super::PackHash, Index) {
-            let mut packhash : super::PackHash = [0u8;super::HASH_SIZE];
+            let mut packhash : super::PackHash = [0u8;HASH_SIZE];
             self.hash_context.result(&mut packhash);
             let path = self.storage_config.get_pack_filepath(&packhash);
             self.tmpfile.render_permanent(&path).unwrap();
