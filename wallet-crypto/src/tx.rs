@@ -932,7 +932,6 @@ mod tests {
 
     #[test]
     fn txaux_encode_decode() {
-        let cfg = Config::default();
         let tx : Tx = cbor::decode_from_cbor(TX).expect("to decode a `Tx`");
         let txinwitness : TxInWitness = cbor::decode_from_cbor(TX_IN_WITNESS).expect("to decode a `TxInWitness`");
 

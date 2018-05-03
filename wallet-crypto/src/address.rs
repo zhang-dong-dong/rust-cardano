@@ -539,7 +539,6 @@ mod tests {
 
     #[test]
     fn encode_decode_digest_blake2b() {
-        let b = b"some random bytes...";
         let digest = DigestBlake2b224::new(b"some random bytes...");
         assert!(cbor::hs::encode_decode(&digest))
     }
