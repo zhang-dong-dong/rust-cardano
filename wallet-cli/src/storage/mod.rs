@@ -1,6 +1,7 @@
 pub mod types;
 pub mod config;
 pub mod pack;
+pub mod tag;
 mod tmpfile;
 mod bitmap;
 use std::{fs, io};
@@ -46,34 +47,6 @@ impl Storage {
 
 fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile {
     TmpFile::create(storage.config.get_filetype_dir(filetype)).unwrap()
-}
-
-pub mod tag {
-    use std::fs;
-    use std::io::{Write,Read};
-    use wallet_crypto::util::{hex};
-
-    pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
-        let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
-        tmp_file.write_all(hex::encode(content).as_bytes()).unwrap();
-        tmp_file.render_permanent(&storage.config.get_tag_filepath(name)).unwrap();
-    }
-
-    pub fn read(storage: &super::Storage, name: &str) -> Option<Vec<u8>> {
-        if ! exist(storage, name) { return None; }
-        let mut content = Vec::new();
-        let path = storage.config.get_tag_filepath(name);
-        let mut file = fs::File::open(path).unwrap();
-        file.read_to_end(&mut content).unwrap();
-        String::from_utf8(content.clone()).ok()
-            .and_then(|r| hex::decode(&r).ok())
-            .or(Some(content))
-    }
-
-    pub fn exist(storage: &super::Storage, name: &str) -> bool {
-        let p = storage.config.get_tag_filepath(name);
-        p.as_path().exists()
-    }
 }
 
 pub mod blob {

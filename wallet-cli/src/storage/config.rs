@@ -46,9 +46,9 @@ impl StorageConfig {
         p.push(encode(blockhash));
         p
     }
-    pub fn get_tag_filepath<P: AsRef<Path>>(&self, s: P) -> PathBuf {
+    pub fn get_tag_filepath<P: AsRef<str>>(&self, s: P) -> PathBuf {
         let mut p = self.get_filetype_dir(StorageFileType::Tag);
-        p.push(s);
+        p.push(s.as_ref());
         p
     }
 

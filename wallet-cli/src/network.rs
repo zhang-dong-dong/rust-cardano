@@ -5,6 +5,7 @@ use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use storage;
 use storage::{blob, tag};
+use storage::tag::{OLDEST_BLOCK, HEAD};
 use rand;
 use std::net::TcpStream;
 use blockchain;
@@ -32,7 +33,7 @@ impl Network {
 // TODO return BlockHeader not MainBlockHeader
 fn network_get_head_header(storage: &storage::Storage, net: &mut Network) -> blockchain::BlockHeader {
     let mbh = GetBlockHeader::first().execute(&mut net.0).expect("to get one header at least");
-    tag::write(&storage, "HEAD", mbh.get_previous_header().as_ref());
+    tag::write(&storage, &HEAD.to_string(), mbh.get_previous_header().as_ref());
     mbh
 }
 
@@ -79,7 +80,7 @@ impl HasCommand for Network {
                 let mut net = Network::new(&config);
 
                 // read from the tags (try OLDEST_BLOCK, then HEAD) is they exist
-                let read_tag = tag::read(&storage, "OLDEST_BLOCK").or_else(|| { tag::read(&storage, "HEAD") });
+                let read_tag = tag::read(&storage, &OLDEST_BLOCK.to_string()).or_else(|| { tag::read(&storage, &HEAD.to_string()) });
                 let oldest_ref = match read_tag {
                     None => {
                         let mbh = network_get_head_header(&storage, &mut net);
@@ -102,12 +103,12 @@ impl HasCommand for Network {
                     match blk {
                         blockchain::Block::GenesisBlock(blk) => {
                             println!("Genesis block {} epoch {} difficulty {}", to_get, blk.header.consensus.epoch, blk.header.consensus.chain_difficulty);
-                            tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());
+                            tag::write(&storage, &OLDEST_BLOCK.to_string(), blk.header.previous_header.as_ref());
                             to_get = blk.header.previous_header.clone()
                         }
                         blockchain::Block::MainBlock(blk) => {
                             println!("block {} epoch {} slotid {}", to_get, blk.header.consensus.slot_id.epoch, blk.header.consensus.slot_id.slotid);
-                            tag::write(&storage, "OLDEST_BLOCK", blk.header.previous_header.as_ref());
+                            tag::write(&storage, &OLDEST_BLOCK.to_string(), blk.header.previous_header.as_ref());
                             to_get = blk.header.previous_header.clone()
                         }
                     }
