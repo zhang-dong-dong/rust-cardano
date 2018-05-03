@@ -167,14 +167,14 @@ fn get_mnemonic_word<D>(index: usize, dic: &D) -> Option<bip39::Mnemonic>
     let mut mmne = None;
 
     for _ in 0..3 {
-        write!(stdout, "mnemonic {}: ", index);
+        write!(stdout, "mnemonic {}: ", index).unwrap();
         stdout.flush().unwrap();
         let midx = stdin.read_passwd(&mut stdout).unwrap();
-        write!(stdout, "{}{}", clear::CurrentLine, cursor::Left(14));
+        write!(stdout, "{}{}", clear::CurrentLine, cursor::Left(14)).unwrap();
         stdout.flush().unwrap();
-        match midx {
+        match midx.and_then(|s| if s == "" { None } else { Some(s)}) {
             None => {
-                write!(stdout, "{}No mnemonic entered.{} Are you done? (No|yes): ", color::Fg(color::Red), color::Fg(color::Reset));
+                write!(stdout, "{}No mnemonic entered.{} Are you done? (No|yes): ", color::Fg(color::Red), color::Fg(color::Reset)).unwrap();
                 stdout.flush().unwrap();
                 let mchoice = stdin.read_line().unwrap();
                 match mchoice {
@@ -188,7 +188,7 @@ fn get_mnemonic_word<D>(index: usize, dic: &D) -> Option<bip39::Mnemonic>
                 match bip39::Mnemonic::from_word(dic, word.as_str()) {
                     Ok(mne) => { mmne = Some(mne); break; },
                     Err(err) => {
-                        writeln!(stdout, "{}Invalid mnemonic{}: {}", color::Fg(color::Red), color::Fg(color::Reset), err);
+                        writeln!(stdout, "{}Invalid mnemonic{}: {}", color::Fg(color::Red), color::Fg(color::Reset), err).unwrap();
                         stdout.flush().unwrap();
                     }
                 }
@@ -208,7 +208,7 @@ fn get_mnemonic_words<D>(dic: &D) -> bip39::Mnemonics
     println!("Enter the mnemonic word one by one as prompted.");
     print!("{}", style::NoItalic);
 
-    for index in 0..25 {
+    for index in 1..25 {
         match get_mnemonic_word(index, dic) {
             None => break,
             Some(idx) => vec.push(idx)
