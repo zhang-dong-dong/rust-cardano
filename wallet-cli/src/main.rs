@@ -8,6 +8,7 @@ extern crate env_logger;
 extern crate serde_yaml;
 extern crate rcw;
 extern crate wallet_crypto;
+extern crate blockchain;
 extern crate protocol;
 extern crate rand;
 extern crate ansi_term;

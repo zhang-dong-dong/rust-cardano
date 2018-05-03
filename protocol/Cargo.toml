@@ -10,6 +10,7 @@ keywords = [ "Cardano", "Protocol" ]
 
 [dependencies]
 wallet-crypto = { path = "../wallet-crypto" }
+blockchain = { path = "../blockchain" }
 log = "0.4"
 
 [dev-dependencies]

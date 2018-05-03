@@ -4,8 +4,8 @@ use std::{fmt};
 use wallet_crypto::cbor::{encode_to_cbor, Value, Bytes, ExtendedResult};
 use wallet_crypto::{cbor};
 use wallet_crypto::config::{ProtocolMagic};
-use block;
-use block::{HeaderHash};
+use blockchain;
+use blockchain::{HeaderHash};
 
 type MessageCode = u32;
 
@@ -120,12 +120,12 @@ impl fmt::Display for HandlerSpecs {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Handshake {
     pub protocol_magic: ProtocolMagic,
-    pub version: block::Version,
+    pub version: blockchain::Version,
     pub in_handlers:  HandlerSpecs,
     pub out_handlers: HandlerSpecs
 }
 impl Handshake {
-    pub fn new(pm: ProtocolMagic, v: block::Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {
+    pub fn new(pm: ProtocolMagic, v: blockchain::Version, ins: HandlerSpecs, outs: HandlerSpecs) -> Self {
         Handshake {
             protocol_magic: pm,
             version: v,
@@ -146,7 +146,7 @@ impl Default for Handshake {
     fn default() -> Self {
         Handshake::new(
             ProtocolMagic::default(),
-            block::Version::default(),
+            blockchain::Version::default(),
             HandlerSpecs::default_ins(),
             HandlerSpecs::default_outs(),
         )
@@ -204,7 +204,7 @@ pub fn send_msg_subscribe(keep_alive: bool) -> Message {
     (0xe, dat)
 }
 
-pub fn send_msg_getheaders(froms: &[block::HeaderHash], to: &Option<block::HeaderHash>) -> Message {
+pub fn send_msg_getheaders(froms: &[blockchain::HeaderHash], to: &Option<blockchain::HeaderHash>) -> Message {
     let mut from_encoded = LinkedList::new();
     for f in froms {
         let b = Bytes::from_slice(f.as_ref());
@@ -232,7 +232,7 @@ pub fn send_msg_getblocks(from: &HeaderHash, to: &HeaderHash) -> Message {
 
 #[derive(Debug)]
 pub enum BlockHeaderResponse {
-    Ok(LinkedList<block::BlockHeader>)
+    Ok(LinkedList<blockchain::BlockHeader>)
 }
 impl fmt::Display for BlockHeaderResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -274,7 +274,7 @@ impl cbor::CborValue for BlockHeaderResponse {
 
 #[derive(Debug)]
 pub enum BlockResponse {
-    Ok(block::Block)
+    Ok(blockchain::Block)
 }
 impl cbor::CborValue for BlockResponse {
     fn encode(&self) -> cbor::Value {

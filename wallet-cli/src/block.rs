@@ -5,6 +5,7 @@ use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use storage::{pack_blobs, block_location, block_read_location, tag, pack, PackParameters};
 use protocol;
+use blockchain;
 use ansi_term::Colour::*;
 
 pub struct Block;
@@ -89,7 +90,7 @@ impl HasCommand for Block {
                     None => hex::decode(&hh_hex).unwrap(),
                     Some(t) => t
                 };
-                let hh = protocol::block::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
+                let hh = blockchain::HeaderHash::from_slice(&hh_bytes).expect("blockid invalid");
 
                 match block_location(&storage, hh.bytes()) {
                     None => {
@@ -100,14 +101,14 @@ impl HasCommand for Block {
                         match block_read_location(&storage, &loc, hh.bytes()) {
                             None        => println!("error while reading"),
                             Some(bytes) => {
-                                let blk : protocol::block::Block = cbor::decode_from_cbor(&bytes).unwrap();
+                                let blk : blockchain::Block = cbor::decode_from_cbor(&bytes).unwrap();
                                 println!("blk location: {:?}", loc);
                                 match blk {
-                                    protocol::block::Block::GenesisBlock(mblock) => {
+                                    blockchain::Block::GenesisBlock(mblock) => {
                                         println!("genesis block display unimplemented");
                                         println!("{:?}", mblock)
                                     },
-                                    protocol::block::Block::MainBlock(mblock) => {
+                                    blockchain::Block::MainBlock(mblock) => {
                                         let hdr = mblock.header;
                                         let body = mblock.body;
                                         println!("### Header");
