@@ -9,7 +9,7 @@ use cbor::ExtendedResult;
 use std::{ops, fmt, result};
 
 /// maximum value of a Lovelace.
-pub const MAX_COIN: u64 = 45000000000000000;
+pub const MAX_COIN: u64 = 45_000_000_000__000_000;
 
 /// error type relating to `Coin` operations
 /// 
