@@ -5,6 +5,10 @@ use wallet_crypto::util::{hex};
 pub const OLDEST_BLOCK : &str = "OLDEST_BLOCK";
 pub const HEAD : &str = "HEAD";
 
+pub fn get_epoch_tag(epoch: u32) -> String {
+    format!("EPOCH_{}", epoch)
+}
+
 pub fn write<S: AsRef<str>>(storage: &super::Storage, name: &S, content: &[u8]) {
     let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
     tmp_file.write_all(hex::encode(content).as_bytes()).unwrap();

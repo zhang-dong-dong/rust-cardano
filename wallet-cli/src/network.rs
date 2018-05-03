@@ -102,8 +102,10 @@ impl HasCommand for Network {
                     let blk : blockchain::Block = cbor::decode_from_cbor(&b[2..]).unwrap();
                     match blk {
                         blockchain::Block::GenesisBlock(blk) => {
+                            let tag_name = tag::get_epoch_tag(blk.header.consensus.epoch);
                             println!("Genesis block {} epoch {} difficulty {}", to_get, blk.header.consensus.epoch, blk.header.consensus.chain_difficulty);
                             tag::write(&storage, &OLDEST_BLOCK.to_string(), blk.header.previous_header.as_ref());
+                            tag::write(&storage, &tag_name, to_get.as_ref());
                             to_get = blk.header.previous_header.clone()
                         }
                         blockchain::Block::MainBlock(blk) => {
