@@ -219,8 +219,7 @@ impl<T: Write+Read> Connection<T> {
 
     pub fn close_light_connection(&mut self, id: LightId) {
         self.client_cons.remove(&id);
-        // TODO: this signal needs to be sent:
-        // self.ntt.close_light(id.0);
+        self.ntt.close_light(id.0).unwrap();
     }
 
     pub fn has_bytes_to_read(&self, id: LightId) -> bool {
@@ -388,7 +387,6 @@ pub mod command {
             trace!("creating light connection: {}", id);
 
             connection.new_light_connection(id).unwrap();
-            connection.broadcast().unwrap(); // expect ack of connection creation
             Ok(id)
         }
         fn execute(&self, connection: &mut Connection<W>) -> Result<Self::Output, &'static str> {
