@@ -1,4 +1,4 @@
-use wallet_crypto::{wallet, hdwallet, bip44, bip39};
+use wallet_crypto::{wallet, bip44, bip39};
 use wallet_crypto::util::base58;
 use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
@@ -6,7 +6,7 @@ use config::{Config};
 use account::{Account};
 use rand;
 
-use termion::{style, color};
+use termion::{style, color, clear, cursor};
 use termion::input::TermRead;
 use std::io::{Write, stdout, stdin};
 
@@ -36,13 +36,13 @@ impl HasCommand for Wallet {
                     .default_value(r"english")
                 )
                 .arg(Arg::with_name("MNEMONIC SIZE")
-                    .long("mnemonic-size")
+                    .long("number-of-mnemonic-words")
                     .takes_value(true)
                     .value_name("MNEMOENIC_SIZE")
-                    .possible_values(&["12-words", "15-words", "18-words", "21-words", "24-words"])
-                    .help("set the size of the mnemonic words")
+                    .possible_values(&["12", "15", "18", "21", "24"])
+                    .help("set the number of the mnemonic words")
                     .required(false)
-                    .default_value(r"15-words")
+                    .default_value(r"15")
                 )
                 .arg(Arg::with_name("PASSWORD")
                     .long("--password")
@@ -95,6 +95,16 @@ impl HasCommand for Wallet {
                 let _storage = cfg.get_storage().unwrap();
                 Some(cfg) // we need to update the config's wallet
             },
+            ("recover", Some(opts)) => {
+                // expect no existing wallet
+                assert!(cfg.wallet.is_none());
+                let language    = value_t!(opts.value_of("LANGUAGE"), String).unwrap(); // we have a default value
+                let password    = value_t!(opts.value_of("PASSWORD"), String).ok();
+                let seed = recover_entropy(language, password);
+                cfg.wallet = Some(Wallet::generate(seed));
+                let _storage = cfg.get_storage().unwrap();
+                Some(cfg) // we need to update the config's wallet
+            },
             ("address", Some(opts)) => {
                 // expect existing wallet
                 assert!(cfg.wallet.is_some());
@@ -131,26 +141,93 @@ impl HasCommand for Wallet {
     }
 }
 
+fn get_password() -> String {
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
+    let stdin = stdin();
+    let mut stdin = stdin.lock();
+
+    stdout.write_all(b"password: ").unwrap();
+    stdout.flush().unwrap();
+
+    let pwd = stdin.read_passwd(&mut stdout).unwrap().unwrap_or("".to_string());
+    stdout.write_all(b"\n").unwrap();
+    stdout.flush().unwrap();
+    pwd
+}
+
+fn get_mnemonic_word<D>(index: usize, dic: &D) -> Option<bip39::Mnemonic>
+    where D: bip39::dictionary::Language
+{
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
+    let stdin = stdin();
+    let mut stdin = stdin.lock();
+
+    let mut mmne = None;
+
+    for _ in 0..3 {
+        write!(stdout, "mnemonic {}: ", index);
+        stdout.flush().unwrap();
+        let midx = stdin.read_passwd(&mut stdout).unwrap();
+        write!(stdout, "{}{}", clear::CurrentLine, cursor::Left(14));
+        stdout.flush().unwrap();
+        match midx {
+            None => {
+                write!(stdout, "{}No mnemonic entered.{} Are you done? (No|yes): ", color::Fg(color::Red), color::Fg(color::Reset));
+                stdout.flush().unwrap();
+                let mchoice = stdin.read_line().unwrap();
+                match mchoice {
+                    None => {},
+                    Some(choice) => {
+                        if choice.to_uppercase() == "YES" { break; }
+                    }
+                };
+            },
+            Some(word) => {
+                match bip39::Mnemonic::from_word(dic, word.as_str()) {
+                    Ok(mne) => { mmne = Some(mne); break; },
+                    Err(err) => {
+                        writeln!(stdout, "{}Invalid mnemonic{}: {}", color::Fg(color::Red), color::Fg(color::Reset), err);
+                        stdout.flush().unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    mmne
+}
+
+fn get_mnemonic_words<D>(dic: &D) -> bip39::Mnemonics
+    where D: bip39::dictionary::Language
+{
+    let mut vec = vec![];
+
+    print!("{}", style::Italic);
+    println!("Enter the mnemonic word one by one as prompted.");
+    print!("{}", style::NoItalic);
+
+    for index in 0..25 {
+        match get_mnemonic_word(index, dic) {
+            None => break,
+            Some(idx) => vec.push(idx)
+        }
+    }
+
+    match bip39::Mnemonics::from_mnemonics(vec) {
+        Err(err) => { panic!("Invalid mnemonic phrase: {}", err); },
+        Ok(mn) => mn
+    }
+}
+
 fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type) -> bip39::Seed {
     assert!(language == "english");
     let dic = &bip39::dictionary::ENGLISH;
 
     let pwd = match opt_pwd {
         Some(pwd) => pwd,
-        None => {
-            let stdout = stdout();
-            let mut stdout = stdout.lock();
-            let stdin = stdin();
-            let mut stdin = stdin.lock();
-
-            stdout.write_all(b"password: ").unwrap();
-            stdout.flush().unwrap();
-
-            let pwd = stdin.read_passwd(&mut stdout).unwrap().unwrap_or("".to_string());
-            stdout.write_all(b"\n").unwrap();
-            stdout.flush().unwrap();
-            pwd
-        }
+        None => get_password()
     };
 
     let entropy = bip39::Entropy::generate(t, rand::random);
@@ -159,4 +236,20 @@ fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type) -
     println!("mnemonic: {}", mnemonic);
 
     bip39::Seed::from_mnemonic_string(&mnemonic, pwd.as_bytes())
+}
+
+fn recover_entropy(language: String, opt_pwd: Option<String>) -> bip39::Seed {
+    assert!(language == "english");
+    let dic = &bip39::dictionary::ENGLISH;
+
+    let mnemonics = get_mnemonic_words(dic);
+
+    let pwd = match opt_pwd {
+        Some(pwd) => pwd,
+        None => get_password()
+    };
+
+    let mnemonics_str = mnemonics.to_string(dic);
+
+    bip39::Seed::from_mnemonic_string(&mnemonics_str, pwd.as_bytes())
 }

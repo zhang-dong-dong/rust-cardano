@@ -291,11 +291,11 @@ pub enum Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Type::Type12Words => write!(f, "12-words"),
-            &Type::Type15Words => write!(f, "15-words"),
-            &Type::Type18Words => write!(f, "18-words"),
-            &Type::Type21Words => write!(f, "21-words"),
-            &Type::Type24Words => write!(f, "24-words"),
+            &Type::Type12Words => write!(f, "12"),
+            &Type::Type15Words => write!(f, "15"),
+            &Type::Type18Words => write!(f, "18"),
+            &Type::Type21Words => write!(f, "21"),
+            &Type::Type24Words => write!(f, "24"),
         }
     }
 }
@@ -303,11 +303,11 @@ impl str::FromStr for Type {
     type Err = &'static str;
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s {
-            "12-words" => Ok(Type::Type12Words),
-            "15-words" => Ok(Type::Type15Words),
-            "18-words" => Ok(Type::Type18Words),
-            "21-words" => Ok(Type::Type21Words),
-            "24-words" => Ok(Type::Type24Words),
+            "12" => Ok(Type::Type12Words),
+            "15" => Ok(Type::Type15Words),
+            "18" => Ok(Type::Type18Words),
+            "21" => Ok(Type::Type21Words),
+            "24" => Ok(Type::Type24Words),
             _          => Err("Unknown bip39 mnemonic size")
         }
     }
