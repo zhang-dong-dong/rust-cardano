@@ -227,13 +227,57 @@ fn generate_entropy(language: String, opt_pwd: Option<String>, t: bip39::Type) -
 
     let pwd = match opt_pwd {
         Some(pwd) => pwd,
-        None => get_password()
+        None => {
+            {
+                let stdout = stdout();
+                let mut stdout = stdout.lock();
+
+                write!(  stdout, "{}", style::Italic).unwrap();
+                writeln!(stdout, "Enter you wallet password. It will be needed to recover").unwrap();
+                writeln!(stdout, "your wallet later with the mnemonic phrase.").unwrap();
+                write!(stdout, "{}", style::NoItalic).unwrap();
+                stdout.flush().unwrap();
+            }
+            let pwd1 = get_password();
+            {
+                let stdout = stdout();
+                let mut stdout = stdout.lock();
+
+                write!(  stdout, "{}", style::Italic).unwrap();
+                writeln!(stdout, "Type your password again.").unwrap();
+                write!(stdout, "{}", style::NoItalic).unwrap();
+                stdout.flush().unwrap();
+            }
+            let pwd2 = get_password();
+
+            if pwd1 != pwd2 {
+                eprintln!("{}not the same password{}", color::Fg(color::Red), color::Fg(color::Reset));
+                panic!("try again");
+            }
+
+            pwd1
+        }
     };
 
     let entropy = bip39::Entropy::generate(t, rand::random);
 
     let mnemonic = entropy.to_mnemonics().to_string(dic);
-    println!("mnemonic: {}", mnemonic);
+    {
+        let stdout = stdout();
+        let mut stdout = stdout.lock();
+        let stdin = stdin();
+        let mut stdin = stdin.lock();
+
+        write!(  stdout, "{}", style::Italic).unwrap();
+        writeln!(stdout, "Note the following words carrefully as you will need it to recover your wallet.").unwrap();
+        writeln!(stdout, "Press `Enter' when you are sure you have saved them.").unwrap();
+        writeln!(stdout, "{}", style::NoItalic).unwrap();
+        write!(stdout, "mnemonic: {}{}{}", color::Fg(color::Green), mnemonic, color::Fg(color::Reset));
+        stdout.flush().unwrap();
+        let _ = stdin.read_passwd(&mut stdout).unwrap().unwrap();
+        write!(stdout, "{}{}", clear::CurrentLine, cursor::Left(128)).unwrap();
+        stdout.flush().unwrap();
+    }
 
     bip39::Seed::from_mnemonic_string(&mnemonic, pwd.as_bytes())
 }
