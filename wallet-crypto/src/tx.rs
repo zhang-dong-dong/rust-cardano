@@ -13,7 +13,6 @@ use redeem;
 use hdwallet::{Signature, XPub, XPrv};
 use address::{ExtendedAddr, SpendingData};
 use hdpayload;
-use merkle;
 use bip44::{Addressing};
 use coin;
 use coin::{Coin};

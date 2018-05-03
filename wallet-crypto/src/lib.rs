@@ -12,7 +12,6 @@ extern crate rcw;
 
 mod crc32;
 pub mod util;
-mod merkle;
 pub mod config;
 pub mod hdwallet;
 pub mod paperwallet;

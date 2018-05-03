@@ -708,7 +708,7 @@ impl<R> Decoder<R> where R: Read {
             0x1b        => { self.consume(); self.u64().map(|v| Some(v)) },
             0x1c...0x1e => Err(Error::UnknownMinorType(b & 0b0001_1111)),
             0x1f        => Ok(None),
-            v           => Err(Error::UnknownMinorType(b))
+            _           => Err(Error::UnknownMinorType(b))
         }
     }
 
