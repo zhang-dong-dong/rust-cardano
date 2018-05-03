@@ -4,7 +4,6 @@ use command::{HasCommand};
 use clap::{ArgMatches, Arg, SubCommand, App};
 use config::{Config};
 use storage::{pack_blobs, block_location, block_read_location, tag, pack, PackParameters};
-use protocol;
 use blockchain;
 use ansi_term::Colour::*;
 

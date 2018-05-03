@@ -1,19 +1,15 @@
 pub mod types;
 pub mod config;
-use std::path::{PathBuf, Path};
+mod tmpfile;
 use std::{fs, io};
-use std::fs::OpenOptions;
 
-use wallet_crypto::util::hex::{encode};
-use wallet_crypto::util::hex::{decode};
 use std::collections::BTreeMap;
 
 use rcw;
 
-use rand;
-
 use self::types::*;
 use self::config::*;
+use self::tmpfile::*;
 
 const USE_COMPRESSION : bool = true;
 
@@ -46,47 +42,6 @@ impl Storage {
     }
 }
 
-pub struct TmpFile {
-    file: fs::File,
-    path: PathBuf,
-}
-impl TmpFile {
-    pub fn create(mut path: PathBuf) -> io::Result<Self> {
-        let v1 : u64 = rand::random();
-        let v2 : u64 = rand::random();
-        path.push(format!(".tmp.{}{}", v1, v2));
-
-        OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .map(|file| TmpFile { file: file, path: path })
-    }
-
-    pub fn render_permanent(&self, path: &PathBuf) -> io::Result<()> {
-        // NOTE: we need to consider what is being written, in a case of a tag we want rename
-        // to error out correctly in every cases rename fail, however in a case of a hash, since the hash is suppose
-        // to represent the same file, some error like EEXIST can be ignored, but some should be raised.
-        // NOTE2: also we consider that the rename is atomic for the tmpfile abstraction to work correctly,
-        // but it mostly depends on the actual filesystem. for most case it should be atomic.
-        match fs::rename(&self.path, path) {
-            _ => {},
-        };
-        Ok(())
-    }
-}
-impl io::Read for TmpFile {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.file.read(buf)
-    }
-}
-impl io::Write for TmpFile {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.file.write(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> { self.file.flush() }
-}
-
 fn tmpfile_create_type(storage: &Storage, filetype: StorageFileType) -> TmpFile {
     TmpFile::create(storage.config.get_filetype_dir(filetype)).unwrap()
 }
@@ -98,7 +53,7 @@ pub mod tag {
 
     pub fn write(storage: &super::Storage, name: &str, content: &[u8]) {
         let mut tmp_file = super::tmpfile_create_type(storage, super::StorageFileType::Tag);
-        tmp_file.file.write_all(hex::encode(content).as_bytes()).unwrap();
+        tmp_file.write_all(hex::encode(content).as_bytes()).unwrap();
         tmp_file.render_permanent(&storage.config.get_tag_filepath(name)).unwrap();
     }
 
@@ -133,9 +88,9 @@ pub mod blob {
             let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
             e.write_all(block).unwrap();
             let compressed_block = e.finish().unwrap();
-            tmp_file.file.write_all(&compressed_block[..]).unwrap();
+            tmp_file.write_all(&compressed_block[..]).unwrap();
         } else {
-            tmp_file.file.write_all(block).unwrap();
+            tmp_file.write_all(block).unwrap();
         }
         tmp_file.render_permanent(&path).unwrap();
 
@@ -424,7 +379,7 @@ pub mod pack {
             }
             Fanout(fanout_incr)
         };
-        tmpfile.file.write_all(&hdr_buf).unwrap();
+        tmpfile.write_all(&hdr_buf).unwrap();
 
         let mut sorted = Vec::with_capacity(entries);
         for i in 0..entries {
@@ -433,13 +388,13 @@ pub mod pack {
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
         for &(hash,_) in sorted.iter() {
-            tmpfile.file.write_all(&hash[..]).unwrap();
+            tmpfile.write_all(&hash[..]).unwrap();
         }
 
         for &(_, ofs) in sorted.iter() {
             let mut buf = [0u8;8];
             write_offset(&mut buf, ofs);
-            tmpfile.file.write_all(&buf[..]).unwrap();
+            tmpfile.write_all(&buf[..]).unwrap();
         }
         (fanout, tmpfile)
     }
@@ -598,14 +553,14 @@ pub mod pack {
             let len = block.len() as Size;
             let mut sz_buf = [0u8;SIZE_SIZE];
             write_size(&mut sz_buf, len);
-            self.tmpfile.file.write_all(&sz_buf[..]).unwrap();
-            self.tmpfile.file.write_all(block).unwrap();
-            self.hash_context.input(block.clone()); // unfortunate cloning
+            self.tmpfile.write_all(&sz_buf[..]).unwrap();
+            self.tmpfile.write_all(block).unwrap();
+            self.hash_context.input(block);
 
             let pad = [0u8;SIZE_SIZE-1];
             let pad_bytes = if (len % 4 as u32) != 0 {
                                 let pad_sz = 4 - len % 4;
-                                self.tmpfile.file.write_all(&pad[0..pad_sz as usize]).unwrap();
+                                self.tmpfile.write_all(&pad[0..pad_sz as usize]).unwrap();
                                 pad_sz
                             } else { 0 };
             self.index.append(blockhash, self.pos);
