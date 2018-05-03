@@ -1,3 +1,12 @@
+//! Redeem keys
+//!
+//! The Redeem was a one off to bootstrap the initial funds of the blockchain.
+//! You should not need to create new redeem keys unless you are starting
+//! a new hardfork of the main network.
+//!
+//! On the **mainnet** you can use the redeem keys to claim redeem addresses.
+//!
+
 use rcw::{ed25519};
 use util::{hex};
 use cbor;
