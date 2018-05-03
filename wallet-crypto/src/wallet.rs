@@ -100,21 +100,19 @@ impl Wallet {
     pub fn new_transaction( &self
                           , inputs: &tx::Inputs
                           , outputs: &tx::Outputs
-                          , fee_addr: &address::ExtendedAddr
                           , change_addr: &address::ExtendedAddr
                           )
-        -> Result<tx::TxAux>
+        -> Result<(tx::TxAux, tx::fee::Fee)>
     {
         let alg = tx::fee::LinearFee::default();
 
-        let (fee, selected_inputs, change) = alg.compute(self.selection_policy, inputs, outputs, change_addr, fee_addr)?;
+        let (fee, selected_inputs, change) = alg.compute(self.selection_policy, inputs, outputs, change_addr)?;
 
         let mut tx = tx::Tx::new_with(
             selected_inputs.iter().cloned().map(|input| input.ptr).collect(),
             outputs.iter().cloned().collect()
         );
 
-        tx.add_output(tx::TxOut::new(fee_addr.clone(), fee.to_coin()));
         tx.add_output(tx::TxOut::new(change_addr.clone(), change));
 
         let mut witnesses = vec![];
@@ -125,7 +123,7 @@ impl Wallet {
             witnesses.push(tx::TxInWitness::new(&self.config, &key, &tx));
         }
 
-        Ok(tx::TxAux::new(tx, witnesses))
+        Ok((tx::TxAux::new(tx, witnesses), fee))
     }
 
     /// retrieve the root extended private key from the wallet but pre

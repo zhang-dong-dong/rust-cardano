@@ -590,7 +590,7 @@ pub mod fee {
     }
 
     pub trait Algorithm {
-        fn compute(&self, policy: SelectionPolicy, inputs: &Inputs, outputs: &Outputs, change_addr: &ExtendedAddr, fee_addr: &ExtendedAddr) -> Result<(Fee, Inputs, Coin)>;
+        fn compute(&self, policy: SelectionPolicy, inputs: &Inputs, outputs: &Outputs, change_addr: &ExtendedAddr) -> Result<(Fee, Inputs, Coin)>;
     }
 
     #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Clone, Copy)]
@@ -620,7 +620,6 @@ pub mod fee {
                   , inputs: &Inputs
                   , outputs: &Outputs
                   , change_addr: &ExtendedAddr
-                  , fee_addr: &ExtendedAddr
                   )
             -> Result<(Fee, Inputs, Coin)>
         {
@@ -652,8 +651,6 @@ pub mod fee {
 
                 let estimated_fee = (self.estimate(txbytes.len() + 5 + (42 * selected_inputs.len())))?;
 
-                // add the fee in the correction of the fee
-                tx.add_output(TxOut::new(fee_addr.clone(), estimated_fee.to_coin()));
                 // add the change in the estimated fee
                 match output_value - input_value - estimated_fee.to_coin() {
                     None => {},
