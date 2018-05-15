@@ -1,10 +1,11 @@
 use std::{fmt, ops, iter, vec, slice, convert};
-use std::collections::{LinkedList, BTreeMap};
+use std::collections::BTreeMap;
 
 use hash::{Blake2b256};
 
 use cbor;
 use cbor::{ExtendedResult};
+use cbor::{IVec};
 use config::{Config};
 use redeem;
 
@@ -237,8 +238,8 @@ impl cbor::CborValue for TxIn {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Tx {
-    pub inputs: LinkedList<TxIn>,
-    pub outputs: LinkedList<TxOut>,
+    pub inputs: IVec<TxIn>,
+    pub outputs: IVec<TxOut>,
     // attributes: TxAttributes
     //
     // So far, there is no TxAttributes... the structure contains only the unparsed/unknown stuff
@@ -255,8 +256,8 @@ impl fmt::Display for Tx {
     }
 }
 impl Tx {
-    pub fn new() -> Self { Tx::new_with(LinkedList::new(), LinkedList::new()) }
-    pub fn new_with(ins: LinkedList<TxIn>, outs: LinkedList<TxOut>) -> Self {
+    pub fn new() -> Self { Tx::new_with(IVec::new(), IVec::new()) }
+    pub fn new_with(ins: IVec<TxIn>, outs: IVec<TxOut>) -> Self {
         Tx { inputs: ins, outputs: outs }
     }
     pub fn id(&self) -> TxId {
@@ -498,7 +499,7 @@ pub mod fee {
             let mut selected_inputs = Inputs::new();
 
             // create the Tx on the fly
-            let mut txins = LinkedList::new();
+            let mut txins = IVec::new();
             let     txouts : LinkedList<TxOut> = outputs.iter().cloned().collect();
 
             // for now we only support this selection algorithm

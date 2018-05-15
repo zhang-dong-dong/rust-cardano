@@ -1,6 +1,6 @@
 //! CBor as specified by the RFC
 
-use std::collections::{BTreeMap, LinkedList};
+use std::collections::BTreeMap;
 use std::cmp::{min};
 use std::{io, result, fmt};
 use util::hex;
@@ -15,6 +15,21 @@ pub enum MajorType {
     MAP,
     TAG,
     T7
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord, Clone, Serialize, Deserialize)]
+pub struct IVec<A>(pub Vec<A>);
+
+impl<A> IVec<A> {
+    pub fn new() -> Self {
+        IVec(Vec::new())
+    }
+    pub fn push(&mut self, v: A) {
+        self.0.push(v)
+    }
+    pub fn push_back(&mut self, v: A) {
+        self.0.push(v)
+    }
 }
 
 impl MajorType {
@@ -151,7 +166,7 @@ pub trait ExtendedResult {
     fn text(v: String, err: Error) -> Self;
     fn bytes(v: Bytes, err: Error) -> Self;
     fn array(v: Vec<Value>, err: Error) -> Self;
-    fn iarray(v: LinkedList<Value>, err: Error) -> Self;
+    fn iarray(v: IVec<Value>, err: Error) -> Self;
     fn object(v: BTreeMap<ObjectKey, Value>, err: Error) -> Self;
     fn tag(tag: u64, v: Box<Value>, err:Error) -> Self;
 }
@@ -166,7 +181,7 @@ impl<V> ExtendedResult for Result<V> {
     fn text(v: String, err: Error) -> Self { Err((Value::Text(v), err)) }
     fn bytes(v: Bytes, err: Error) -> Self { Err((Value::Bytes(v), err)) }
     fn array(v: Vec<Value>, err: Error) -> Self { Err((Value::Array(v), err)) }
-    fn iarray(v: LinkedList<Value>, err: Error) -> Self { Err((Value::IArray(v), err)) }
+    fn iarray(v: IVec<Value>, err: Error) -> Self { Err((Value::IArray(v), err)) }
     fn object(v: BTreeMap<ObjectKey, Value>, err: Error) -> Self { Err((Value::Object(v), err)) }
     fn tag(tag: u64, v: Box<Value>, err:Error) -> Self {
         Err((Value::Tag(tag, v), err))
@@ -206,7 +221,7 @@ pub enum Value {
     Text(String),
     Array(Vec<Value>),
     ArrayStart,
-    IArray(LinkedList<Value>),
+    IArray(IVec<Value>),
     Object(BTreeMap<ObjectKey, Value>),
     Tag(u64, Box<Value>),
     Break,
@@ -243,7 +258,7 @@ impl Value {
             v               => Err((v, Error::ExpectedArray))
         }
     }
-    pub fn iarray(self) -> Result<LinkedList<Value>> {
+    pub fn iarray(self) -> Result<IVec<Value>> {
         match self {
             Value::IArray(v) => Ok(v),
             v                => Err((v, Error::ExpectedArray))
@@ -359,10 +374,10 @@ impl<T> CborValue for Vec<T> where T: CborValue {
         })
     }
 }
-impl<T> CborValue for LinkedList<T> where T: CborValue {
+impl<T> CborValue for IVec<T> where T: CborValue {
     fn encode(&self) -> Value {
-        let mut l = LinkedList::new();
-        for i in self.iter() {
+        let mut l = IVec::new();
+        for i in self.0.iter() {
             let v = CborValue::encode(i);
             l.push_back(v);
         }
@@ -370,10 +385,10 @@ impl<T> CborValue for LinkedList<T> where T: CborValue {
     }
     fn decode(value: Value) -> Result<Self> {
         value.iarray().and_then(|list| {
-            let mut r = LinkedList::new();
-            for i in list.iter() {
+            let mut r = IVec::new();
+            for i in list.0.iter() {
                 let v = CborValue::decode(i.clone())?;
-                r.push_back(v);
+                r.push(v);
             }
             Ok(r)
         })
@@ -582,9 +597,9 @@ impl<W> Encoder<W> where W: io::Write {
         self.write_bytes(&[mt.to_byte(0x1F)])
     }
 
-    fn write_iarray(&mut self, v: &LinkedList<Value>) -> io::Result<()> {
+    fn write_iarray(&mut self, v: &IVec<Value>) -> io::Result<()> {
         self.start_indefinite(MajorType::ARRAY)?;
-        for e in v.iter() { self.write(e)?; }
+        for e in v.0.iter() { self.write(e)?; }
         self.write_bytes(&[0xFF]) // add the break
     }
 
@@ -789,7 +804,7 @@ impl<R> Decoder<R> where R: Read {
                     None      => {
                         if self.get_minor() == Some(0x1F) {
                             // this is an Indefinite array
-                            let mut array = LinkedList::new();
+                            let mut array = Vec::new();
                             // consume the minor type
                             self.consume();
                             loop {
@@ -798,9 +813,9 @@ impl<R> Decoder<R> where R: Read {
                                     Some(v) => v,
                                 };
                                 if val == Value::Break { break; }
-                                array.push_back(val);
+                                array.push(val);
                             }
-                            Ok(Some(Value::IArray(array)))
+                            Ok(Some(Value::IArray(IVec(array))))
                         } else {
                             Err(Error::ExpectedT7)
                         }
